@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title></title>
+  <title>Sync Performance Review (V19)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -33,12 +33,51 @@
       min-height: 0; 
     }
     
+    /* FIX: Drastically scaled down spacing, labels, and heights when landscape is active */
     @media (orientation: landscape) {
-      .container { flex-direction: row; }
-      .box { height: 100% !important; width: 50% !important; }
+      body, html {
+        padding: env(safe-area-inset-top, 4px) 8px calc(env(safe-area-inset-bottom, 0px) + 4px) 8px;
+      }
+      .container { 
+        flex-direction: row; 
+        gap: 8px;
+      }
+      .box { 
+        height: 100% !important; 
+        width: 50% !important; 
+      }
+      .label {
+        top: 6px !important;
+        left: 6px !important;
+        font-size: 9px !important;
+        padding: 2px 6px !important;
+      }
+      .rec-indicator {
+        top: 6px !important;
+        right: 6px !important;
+        font-size: 9px !important;
+        padding: 2px 6px !important;
+      }
+      .zoom-container {
+        bottom: 6px !important;
+        padding: 4px 8px !important;
+      }
+      .timeline-footer {
+        height: 28px !important;
+        margin-top: 4px !important;
+        gap: 8px !important;
+      }
+      .controls-footer {
+        height: 42px !important;
+        margin-top: 4px !important;
+      }
+      button {
+        padding: 8px 16px !important;
+        font-size: 12px !important;
+        border-radius: 6px !important;
+      }
     }
 
-    /* FIX: Set explicit equal flex basis and zero initial height to force an absolute 50/50 split */
     .box { 
       position: relative; 
       width: 100%; 
@@ -52,7 +91,6 @@
       flex-direction: column; 
     }
     
-    /* FIX: Secured full height distribution inside the viewport containers */
     .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; }
     
     video { width: 100%; height: 100%; object-fit: cover; background: #000; transition: transform 0.1s ease-out; transform-origin: center center; }
@@ -125,7 +163,7 @@
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
-    <div class="version-tag">V18</div>
+    <div class="version-tag">V19</div>
   </div>
 
   <script>
