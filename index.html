@@ -70,7 +70,7 @@
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
-    <div class="version-tag">Version 7</div>
+    <div class="version-tag">Version 8</div>
   </div>
 
   <script>
@@ -88,8 +88,6 @@
     let isRecordingMode = false;
     let isReviewMode = false;
     let loopInterval = null;
-    
-    // FIXED: Tracks active user scrubbing source to completely prevent cross-talk stutter
     let activeScrubSource = null; 
 
     async function initCamera() {
@@ -131,6 +129,17 @@
       actionBtn.innerText = "Play Review";
     }
 
+    // Centered Loop Trigger Execution
+    function triggerSynchronizedLoop() {
+      pauseBoth();
+      refVideo.currentTime = 0;
+      viewfinder.currentTime = 0;
+      
+      setTimeout(() => {
+        if (isReviewMode) playBoth();
+      }, 200);
+    }
+
     resetBtn.addEventListener('click', () => {
       clearInterval(loopInterval);
       isRecordingMode = false;
@@ -138,11 +147,12 @@
       recordedChunks = [];
       activeScrubSource = null;
       
-      // Detach listeners completely
       refVideo.onseeking = null;
       refVideo.onseeked = null;
+      refVideo.onended = null;
       viewfinder.onseeking = null;
       viewfinder.onseeked = null;
+      viewfinder.onended = null;
       
       refVideo.pause();
       refVideo.currentTime = 0;
@@ -272,31 +282,19 @@
       }
     }
 
-    // FIXED: Clean asymmetric synchronization logic to completely eliminate choppiness
     function setupManualScrubSync() {
-      // 1. User scrubs the Reference video
       refVideo.onseeking = () => {
         if (!isReviewMode) return;
-        if (activeScrubSource === null) {
-          activeScrubSource = 'reference';
-        }
-        if (activeScrubSource === 'reference') {
-          viewfinder.currentTime = refVideo.currentTime;
-        }
+        if (activeScrubSource === null) activeScrubSource = 'reference';
+        if (activeScrubSource === 'reference') viewfinder.currentTime = refVideo.currentTime;
       };
 
-      // 2. User scrubs the Recorded video
       viewfinder.onseeking = () => {
         if (!isReviewMode) return;
-        if (activeScrubSource === null) {
-          activeScrubSource = 'recorded';
-        }
-        if (activeScrubSource === 'recorded') {
-          refVideo.currentTime = viewfinder.currentTime;
-        }
+        if (activeScrubSource === null) activeScrubSource = 'recorded';
+        if (activeScrubSource === 'recorded') refVideo.currentTime = viewfinder.currentTime;
       };
 
-      // 3. Clear locked source once the browser completely catches up rendering the destination frame
       refVideo.onseeked = () => {
         if (activeScrubSource === 'recorded') activeScrubSource = null;
       };
@@ -304,27 +302,29 @@
       viewfinder.onseeked = () => {
         if (activeScrubSource === 'reference') activeScrubSource = null;
       };
+
+      // FIXED: Hard event handlers added directly to native media properties to catch the first pass boundary
+      refVideo.onended = () => {
+        if (isReviewMode) triggerSynchronizedLoop();
+      };
+      
+      viewfinder.onended = () => {
+        if (isReviewMode) triggerSynchronizedLoop();
+      };
     }
 
     function startLoopEngine() {
       clearInterval(loopInterval);
       
       loopInterval = setInterval(() => {
-        // Guard engine loops if user is currently scrubbing timeline
         if (!isReviewMode || refVideo.paused || activeScrubSource !== null) return;
 
+        // FIXED: Added check for 'viewfinder.ended' or absolute ceiling if browser duration calculation drifts
         const refEnded = refVideo.currentTime >= refVideo.duration - 0.15 || refVideo.ended;
-        const viewEnded = viewfinder.currentTime >= viewfinder.duration - 0.15 || viewfinder.ended;
+        const viewEnded = (viewfinder.duration && viewfinder.currentTime >= viewfinder.duration - 0.15) || viewfinder.ended;
 
         if (refEnded || viewEnded) {
-          pauseBoth();
-          
-          refVideo.currentTime = 0;
-          viewfinder.currentTime = 0;
-          
-          setTimeout(() => {
-            playBoth();
-          }, 200); 
+          triggerSynchronizedLoop();
         }
       }, 100);
     }
