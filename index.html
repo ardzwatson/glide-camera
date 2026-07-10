@@ -1,22 +1,196 @@
-function startRecordingSession() {
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Sync Performance Review</title>
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <style>
+    body, html { margin: 0; padding: 12px; width: 100%; height: 100%; box-sizing: border-box; background: #111; color: white; font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; }
+    
+    .container { display: flex; flex-direction: column; gap: 12px; width: 100%; height: calc(100% - 70px); }
+    
+    @media (orientation: landscape) {
+      .container { flex-direction: row; }
+      .box { height: 100% !important; width: 50% !important; aspect-ratio: auto !important; }
+    }
+
+    .box { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
+    video { width: 100%; height: 100%; object-fit: cover; background: #000; }
+    
+    .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; }
+    
+    /* Control Footer Setup */
+    .controls-footer { height: 60px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 10px; }
+    button { background: #007aff; color: white; border: none; padding: 12px 24px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s, opacity 0.2s; }
+    button:active { background: #0056b3; }
+    button:disabled { background: #444; color: #888; cursor: not-allowed; }
+    
+    /* Special Context Dynamic Button Colors */
+    .btn-recording { background: #ff453a !important; }
+    .btn-recording:active { background: #ff3b30 !important; }
+    
+    #resetBtn { background: #8e8e93; }
+    #resetBtn:active { background: #636366; }
+    #resetBtn.danger-active { background: #ff3b30; }
+    #resetBtn.danger-active:active { background: #b3241f; }
+
+    /* Overlay Countdown Text */
+    .countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: #fff; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .countdown-overlay.show { opacity: 1; }
+    
+    /* Live Status Indicators */
+    .rec-indicator { position: absolute; top: 12px; right: 12px; background: #ff3b30; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; animation: pulse 1s infinite alternate; display: none; z-index: 10; }
+    @keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Reference Video Window -->
+    <div class="box">
+      <div class="label">REFERENCE LESSON</div>
+      <video id="refVideo" src="https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4" playsinline webkit-playsinline></video>
+      <div class="countdown-overlay" id="countdown">3</div>
+    </div>
+
+    <!-- User Stream Interaction Window -->
+    <div class="box" id="cameraBox">
+      <div class="label" id="streamLabel">YOU (LIVE CAM)</div>
+      <div class="rec-indicator" id="recBadge">● RECORDING</div>
+      <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
+    </div>
+  </div>
+
+  <!-- Action Dashboard Layout Footer -->
+  <div class="controls-footer">
+    <button id="actionBtn">Start Session</button>
+    <button id="resetBtn" disabled>Reset / Clear</button>
+  </div>
+
+  <script>
+    const refVideo = document.getElementById('refVideo');
+    const viewfinder = document.getElementById('viewfinder');
+    const actionBtn = document.getElementById('actionBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const countdown = document.getElementById('countdown');
+    const recBadge = document.getElementById('recBadge');
+    const streamLabel = document.getElementById('streamLabel');
+
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let liveStream = null;
+    let isRecordingMode = false;
+    let isReviewMode = false;
+    let isSyncing = false;
+
+    // Initialize Camera Access Frame
+    async function initCamera() {
+      try {
+        liveStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: true 
+        });
+        viewfinder.srcObject = liveStream;
+      } catch (err) {
+        alert("Camera and Microphone access required to sync performance.");
+        console.error(err);
+      }
+    }
+
+    // Action Coordinator Button Loop
+    actionBtn.addEventListener('click', () => {
+      if (!isRecordingMode && !isReviewMode) {
+        runCountdown();
+      } else if (isRecordingMode) {
+        stopRecordingEarly();
+      } else if (isReviewMode) {
+        // Toggle Dual Play/Pause state during Review Mode
+        if (refVideo.paused) {
+          refVideo.play();
+          viewfinder.play();
+          actionBtn.innerText = "Pause Review";
+        } else {
+          refVideo.pause();
+          viewfinder.pause();
+          actionBtn.innerText = "Play Review";
+        }
+      }
+    });
+
+    // Reset Engine Setup
+    resetBtn.addEventListener('click', () => {
+      isRecordingMode = false;
+      isReviewMode = false;
+      recordedChunks = [];
+      
+      refVideo.pause();
+      refVideo.currentTime = 0;
+      refVideo.controls = false;
+
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+      }
+      
+      viewfinder.srcObject = null;
+      viewfinder.src = "";
+      viewfinder.srcObject = liveStream;
+      viewfinder.muted = true;
+      viewfinder.controls = false;
+      
+      recBadge.style.display = "none";
+      streamLabel.innerText = "YOU (LIVE CAM)";
+      
+      actionBtn.innerText = "Start Session";
+      actionBtn.className = ""; 
+      actionBtn.disabled = false;
+      
+      resetBtn.innerText = "Reset / Clear";
+      resetBtn.className = "";
+      resetBtn.disabled = true;
+    });
+
+    function runCountdown() {
+      actionBtn.disabled = true;
+      resetBtn.disabled = true;
+      countdown.classList.add('show');
+      let count = 3;
+      countdown.innerText = count;
+
+      const timer = setInterval(() => {
+        count--;
+        if (count > 0) {
+          countdown.innerText = count;
+        } else {
+          clearInterval(timer);
+          countdown.classList.remove('show');
+          startRecordingSession();
+        }
+      }, 1000);
+    }
+
+    function startRecordingSession() {
       recordedChunks = [];
       refVideo.currentTime = 0;
       isRecordingMode = true;
       
-      // OPTIMIZED: Prioritize native MP4/H.264/AVC for smooth mobile hardware rendering
+      // OPTIMIZED: Native mobile recording format fallback tree
       let options = { mimeType: 'video/mp4;codecs=avc1.42E01E,mp4a.40.2' };
       
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
         options = { mimeType: 'video/mp4' };
       }
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options = { mimeType: 'video/webm;codecs=vp8,opus' }; // Fallback for older desktop environments
+        options = { mimeType: 'video/webm;codecs=vp8,opus' }; 
       }
 
       try {
         mediaRecorder = new MediaRecorder(liveStream, options);
       } catch (e) {
-        // Ultimate safe fallback
         mediaRecorder = new MediaRecorder(liveStream);
       }
       
@@ -36,7 +210,7 @@ function startRecordingSession() {
         viewfinder.src = URL.createObjectURL(videoBlob);
         viewfinder.muted = false; 
         
-        // OPTIMIZED: Add attributes directly to the element to force mobile performance stability
+        // Force hardware inline playback setup
         viewfinder.setAttribute('playsinline', 'true');
         viewfinder.setAttribute('webkit-playsinline', 'true');
         
@@ -60,7 +234,8 @@ function startRecordingSession() {
         setupTimelineLocking();
       };
 
-      mediaRecorder.start(100); // OPTIMIZED: Slice data every 100ms to avoid high-memory rendering spikes
+      // Process in small slices to eliminate lagging memory spikes
+      mediaRecorder.start(100); 
       refVideo.play();
       
       recBadge.style.display = "block";
@@ -77,3 +252,36 @@ function startRecordingSession() {
         }
       };
     }
+
+    function stopRecordingEarly() {
+      refVideo.pause();
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+      }
+    }
+
+    function setupTimelineLocking() {
+      refVideo.addEventListener('timeupdate', () => {
+        if (isSyncing) return;
+        isSyncing = true;
+        viewfinder.currentTime = refVideo.currentTime;
+        isSyncing = false;
+      });
+
+      viewfinder.addEventListener('timeupdate', () => {
+        if (isSyncing) return;
+        isSyncing = true;
+        refVideo.currentTime = viewfinder.currentTime;
+        isSyncing = false;
+      });
+
+      refVideo.addEventListener('play', () => { viewfinder.play(); actionBtn.innerText = "Pause Review"; });
+      refVideo.addEventListener('pause', () => { viewfinder.pause(); actionBtn.innerText = "Play Review"; });
+      viewfinder.addEventListener('play', () => { refVideo.play(); actionBtn.innerText = "Pause Review"; });
+      viewfinder.addEventListener('pause', () => { refVideo.pause(); actionBtn.innerText = "Play Review"; });
+    }
+
+    window.addEventListener('DOMContentLoaded', initCamera);
+  </script>
+</body>
+</html>
