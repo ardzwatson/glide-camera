@@ -25,10 +25,13 @@
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; }
     
     /* Control Footer Setup */
-    .controls-footer { height: 60px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 10px; }
+    .controls-footer { height: 60px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 10px; position: relative; }
     button { background: #007aff; color: white; border: none; padding: 12px 24px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s, opacity 0.2s; }
     button:active { background: #0056b3; }
     button:disabled { background: #444; color: #888; cursor: not-allowed; }
+    
+    /* Version Label Tracking Layout */
+    .version-tag { color: #666; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: monospace; }
     
     /* Special Context Dynamic Button Colors */
     .btn-recording { background: #ff453a !important; }
@@ -70,6 +73,7 @@
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
+    <div class="version-tag">Version 4</div>
   </div>
 
   <script>
@@ -86,13 +90,13 @@
     let liveStream = null;
     let isRecordingMode = false;
     let isReviewMode = false;
-    let isSyncing = false;
+    let loopInterval = null;
 
     // Initialize Camera Access Frame
     async function initCamera() {
       try {
         liveStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" },
+          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 360 } },
           audio: true 
         });
         viewfinder.srcObject = liveStream;
@@ -109,27 +113,32 @@
       } else if (isRecordingMode) {
         stopRecordingEarly();
       } else if (isReviewMode) {
-        // Master Play/Pause controller
         if (refVideo.paused) {
-          viewfinder.play();
-          refVideo.play();
-          actionBtn.innerText = "Pause Review";
+          playBoth();
         } else {
-          viewfinder.pause();
-          refVideo.pause();
-          actionBtn.innerText = "Play Review";
+          pauseBoth();
         }
       }
     });
 
+    function playBoth() {
+      viewfinder.play();
+      refVideo.play();
+      actionBtn.innerText = "Pause Review";
+    }
+
+    function pauseBoth() {
+      viewfinder.pause();
+      refVideo.pause();
+      actionBtn.innerText = "Play Review";
+    }
+
     // Reset Engine Setup
     resetBtn.addEventListener('click', () => {
+      clearInterval(loopInterval);
       isRecordingMode = false;
       isReviewMode = false;
       recordedChunks = [];
-      
-      // Clean up event listeners to prevent legacy loops
-      refVideo.onended = null;
       
       refVideo.pause();
       refVideo.currentTime = 0;
@@ -181,15 +190,11 @@
       refVideo.currentTime = 0;
       isRecordingMode = true;
       
-      let options = { mimeType: 'video/webm;codecs=vp8,opus' };
-      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options = { mimeType: 'video/mp4' };
-      }
-
+      // Let system auto-select best local optimized hardware codec
       try {
-        mediaRecorder = new MediaRecorder(liveStream, options);
-      } catch (e) {
         mediaRecorder = new MediaRecorder(liveStream);
+      } catch (e) {
+        console.error("MediaRecorder fallback failed", e);
       }
       
       mediaRecorder.ondataavailable = (e) => {
@@ -202,7 +207,7 @@
         
         if (recordedChunks.length === 0) return;
 
-        const videoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
+        const videoBlob = new Blob(recordedChunks, { type: 'video/mp4' });
         
         viewfinder.srcObject = null;
         viewfinder.src = URL.createObjectURL(videoBlob);
@@ -228,7 +233,7 @@
         refVideo.currentTime = 0;
         viewfinder.currentTime = 0;
         
-        setupReviewLoopAndSync();
+        startLoopEngine();
       };
 
       mediaRecorder.start(); 
@@ -242,7 +247,7 @@
       resetBtn.innerText = "Cancel Run";
       resetBtn.disabled = false;
 
-      // Handle natural completion during recording phase
+      // Safe stop when track ends naturally
       refVideo.onended = () => {
         if (mediaRecorder && mediaRecorder.state !== "inactive") {
           mediaRecorder.stop();
@@ -257,46 +262,26 @@
       }
     }
 
-    function setupReviewLoopAndSync() {
-      // FIXED: Hard hardware reset loop for perfect, lag-free rewatches
-      refVideo.onended = () => {
-        if (!isReviewMode) return;
-        
-        // Pause both immediately to sever lag drift
-        refVideo.pause();
-        viewfinder.pause();
-        
-        // Hard-reset timelines back to starting frame
-        refVideo.currentTime = 0;
-        viewfinder.currentTime = 0;
-        
-        // Restart cleanly together
-        setTimeout(() => {
-          viewfinder.play();
-          refVideo.play();
-        }, 50);
-      };
+    // FIXED: Independent, highly performant polling engine to force loop without drifting
+    function startLoopEngine() {
+      clearInterval(loopInterval);
+      
+      loopInterval = setInterval(() => {
+        if (!isReviewMode || refVideo.paused) return;
 
-      // Only sync timelines when manual scrubbing/seeking happens to prevent stutters
-      refVideo.addEventListener('seeking', () => {
-        if (isSyncing) return;
-        isSyncing = true;
-        viewfinder.currentTime = refVideo.currentTime;
-        isSyncing = false;
-      });
-
-      viewfinder.addEventListener('seeking', () => {
-        if (isSyncing) return;
-        isSyncing = true;
-        refVideo.currentTime = viewfinder.currentTime;
-        isSyncing = false;
-      });
-
-      // Synchronized play state layout matching
-      refVideo.addEventListener('play', () => { viewfinder.play(); actionBtn.innerText = "Pause Review"; });
-      refVideo.addEventListener('pause', () => { viewfinder.pause(); actionBtn.innerText = "Play Review"; });
-      viewfinder.addEventListener('play', () => { refVideo.play(); actionBtn.innerText = "Pause Review"; });
-      viewfinder.addEventListener('pause', () => { refVideo.pause(); actionBtn.innerText = "Play Review"; });
+        // Check if reference video finished or is about to end
+        if (refVideo.currentTime >= refVideo.duration - 0.1 || refVideo.ended) {
+          pauseBoth();
+          
+          // FastCache hard reset to clean browser memory stream buffer
+          refVideo.currentTime = 0;
+          viewfinder.currentTime = 0;
+          
+          setTimeout(() => {
+            playBoth();
+          }, 150); 
+        }
+      }, 100); // Poll every 100ms for robust frame timing layout tracking
     }
 
     window.addEventListener('DOMContentLoaded', initCamera);
