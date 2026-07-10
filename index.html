@@ -54,14 +54,12 @@
 <body>
 
   <div class="container">
-    <!-- Reference Video Window -->
     <div class="box">
       <div class="label">REFERENCE LESSON</div>
       <video id="refVideo" src="https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4" playsinline webkit-playsinline></video>
       <div class="countdown-overlay" id="countdown">3</div>
     </div>
 
-    <!-- User Stream Interaction Window -->
     <div class="box" id="cameraBox">
       <div class="label" id="streamLabel">YOU (LIVE CAM)</div>
       <div class="rec-indicator" id="recBadge">● RECORDING</div>
@@ -69,11 +67,10 @@
     </div>
   </div>
 
-  <!-- Action Dashboard Layout Footer -->
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
-    <div class="version-tag">Version 6</div>
+    <div class="version-tag">Version 7</div>
   </div>
 
   <script>
@@ -90,10 +87,11 @@
     let liveStream = null;
     let isRecordingMode = false;
     let isReviewMode = false;
-    let isSyncing = false;
     let loopInterval = null;
+    
+    // FIXED: Tracks active user scrubbing source to completely prevent cross-talk stutter
+    let activeScrubSource = null; 
 
-    // Initialize Camera Access Frame
     async function initCamera() {
       try {
         liveStream = await navigator.mediaDevices.getUserMedia({
@@ -107,7 +105,6 @@
       }
     }
 
-    // Action Coordinator Button Loop
     actionBtn.addEventListener('click', () => {
       if (!isRecordingMode && !isReviewMode) {
         runCountdown();
@@ -134,16 +131,18 @@
       actionBtn.innerText = "Play Review";
     }
 
-    // Reset Engine Setup
     resetBtn.addEventListener('click', () => {
       clearInterval(loopInterval);
       isRecordingMode = false;
       isReviewMode = false;
       recordedChunks = [];
+      activeScrubSource = null;
       
-      // Clean up event listeners to prevent residual ghosting loops
+      // Detach listeners completely
       refVideo.onseeking = null;
+      refVideo.onseeked = null;
       viewfinder.onseeking = null;
+      viewfinder.onseeked = null;
       
       refVideo.pause();
       refVideo.currentTime = 0;
@@ -226,7 +225,6 @@
         streamLabel.innerText = "YOU (RECORDED REVIEW)";
         isReviewMode = true;
         
-        // FIXED: Stop any lingering play state right away to force synchronized playback start
         refVideo.pause();
         viewfinder.pause();
         
@@ -274,20 +272,37 @@
       }
     }
 
-    // FIXED: Snaps timelines together instantly when dragging/scrubbing a video timeline
+    // FIXED: Clean asymmetric synchronization logic to completely eliminate choppiness
     function setupManualScrubSync() {
+      // 1. User scrubs the Reference video
       refVideo.onseeking = () => {
-        if (isSyncing || !isReviewMode) return;
-        isSyncing = true;
-        viewfinder.currentTime = refVideo.currentTime;
-        isSyncing = false;
+        if (!isReviewMode) return;
+        if (activeScrubSource === null) {
+          activeScrubSource = 'reference';
+        }
+        if (activeScrubSource === 'reference') {
+          viewfinder.currentTime = refVideo.currentTime;
+        }
       };
 
+      // 2. User scrubs the Recorded video
       viewfinder.onseeking = () => {
-        if (isSyncing || !isReviewMode) return;
-        isSyncing = true;
-        refVideo.currentTime = viewfinder.currentTime;
-        isSyncing = false;
+        if (!isReviewMode) return;
+        if (activeScrubSource === null) {
+          activeScrubSource = 'recorded';
+        }
+        if (activeScrubSource === 'recorded') {
+          refVideo.currentTime = viewfinder.currentTime;
+        }
+      };
+
+      // 3. Clear locked source once the browser completely catches up rendering the destination frame
+      refVideo.onseeked = () => {
+        if (activeScrubSource === 'recorded') activeScrubSource = null;
+      };
+
+      viewfinder.onseeked = () => {
+        if (activeScrubSource === 'reference') activeScrubSource = null;
       };
     }
 
@@ -295,7 +310,8 @@
       clearInterval(loopInterval);
       
       loopInterval = setInterval(() => {
-        if (!isReviewMode || refVideo.paused) return;
+        // Guard engine loops if user is currently scrubbing timeline
+        if (!isReviewMode || refVideo.paused || activeScrubSource !== null) return;
 
         const refEnded = refVideo.currentTime >= refVideo.duration - 0.15 || refVideo.ended;
         const viewEnded = viewfinder.currentTime >= viewfinder.duration - 0.15 || viewfinder.ended;
