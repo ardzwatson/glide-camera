@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V19)</title>
+  <title>Sync Performance Review (V20)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -33,7 +33,6 @@
       min-height: 0; 
     }
     
-    /* FIX: Drastically scaled down spacing, labels, and heights when landscape is active */
     @media (orientation: landscape) {
       body, html {
         padding: env(safe-area-inset-top, 4px) 8px calc(env(safe-area-inset-bottom, 0px) + 4px) 8px;
@@ -124,6 +123,10 @@
     #resetBtn.danger-active { background: #ff3b30; }
     #resetBtn.danger-active:active { background: #b3241f; }
 
+    /* UI ADDITION: Download styling */
+    #downloadBtn { background: #34c759; display: none; }
+    #downloadBtn:active { background: #248a3d; }
+
     .countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: #fff; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
     .countdown-overlay.show { opacity: 1; }
     
@@ -162,8 +165,9 @@
 
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
+    <button id="downloadBtn">Download Video</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
-    <div class="version-tag">V19</div>
+    <div class="version-tag">V20</div>
   </div>
 
   <script>
@@ -171,6 +175,7 @@
     const viewfinder = document.getElementById('viewfinder');
     const actionBtn = document.getElementById('actionBtn');
     const resetBtn = document.getElementById('resetBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
     const countdown = document.getElementById('countdown');
     const recBadge = document.getElementById('recBadge');
     const streamLabel = document.getElementById('streamLabel');
@@ -193,6 +198,7 @@
     let isUserScrubbing = false;
     let zoomFadeTimeout = null;
     let chosenScale = 1;
+    let currentVideoBlob = null;
 
     async function initCamera() {
       try {
@@ -274,12 +280,29 @@
       actionBtn.click();
     });
 
+    /* FUNCTIONALITY ADDITION: Local file export tracking */
+    downloadBtn.addEventListener('click', () => {
+      if (!currentVideoBlob) return;
+      const url = URL.createObjectURL(currentVideoBlob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `performance-review-${Date.now()}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+    });
+
     resetBtn.addEventListener('click', () => {
       clearInterval(loopInterval);
       clearTimeout(zoomFadeTimeout);
       isRecordingMode = false;
       isReviewMode = false;
       recordedChunks = [];
+      currentVideoBlob = null;
       chosenScale = 1;
       
       refVideo.pause();
@@ -295,6 +318,7 @@
       viewfinder.muted = true;
       
       masterTimeline.classList.remove('show');
+      downloadBtn.style.display = "none";
       
       zoomSlider.value = 1;
       zoomLabel.innerText = "1.0x";
@@ -317,6 +341,7 @@
     function runCountdown() {
       actionBtn.disabled = true;
       resetBtn.disabled = true;
+      downloadBtn.style.display = "none";
       countdown.classList.add('show');
       let count = 3;
       countdown.innerText = count;
@@ -335,6 +360,7 @@
 
     function startRecordingSession() {
       recordedChunks = [];
+      currentVideoBlob = null;
       refVideo.currentTime = 0;
       isRecordingMode = true;
       
@@ -355,10 +381,10 @@
         
         if (recordedChunks.length === 0) return;
 
-        const videoBlob = new Blob(recordedChunks, { type: 'video/mp4' });
+        currentVideoBlob = new Blob(recordedChunks, { type: 'video/mp4' });
         
         viewfinder.srcObject = null;
-        viewfinder.src = URL.createObjectURL(videoBlob);
+        viewfinder.src = URL.createObjectURL(currentVideoBlob);
         viewfinder.muted = false; 
         
         viewfinder.setAttribute('playsinline', 'true');
@@ -377,6 +403,7 @@
         viewfinder.currentTime = 0;
 
         masterTimeline.classList.add('show');
+        downloadBtn.style.display = "block";
         scrubSlider.value = 0;
 
         actionBtn.innerText = "Play Review";
