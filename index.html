@@ -109,14 +109,14 @@
       } else if (isRecordingMode) {
         stopRecordingEarly();
       } else if (isReviewMode) {
-        // Toggle Dual Play/Pause state during Review Mode
+        // Master Play/Pause controller
         if (refVideo.paused) {
-          refVideo.play();
           viewfinder.play();
+          refVideo.play();
           actionBtn.innerText = "Pause Review";
         } else {
-          refVideo.pause();
           viewfinder.pause();
+          refVideo.pause();
           actionBtn.innerText = "Play Review";
         }
       }
@@ -178,14 +178,10 @@
       refVideo.currentTime = 0;
       isRecordingMode = true;
       
-      // OPTIMIZED: Native mobile recording format fallback tree
-      let options = { mimeType: 'video/mp4;codecs=avc1.42E01E,mp4a.40.2' };
-      
+      // Preferred Android container is webm, preferred iOS container is mp4
+      let options = { mimeType: 'video/webm;codecs=vp8,opus' };
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
         options = { mimeType: 'video/mp4' };
-      }
-      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options = { mimeType: 'video/webm;codecs=vp8,opus' }; 
       }
 
       try {
@@ -204,13 +200,12 @@
         
         if (recordedChunks.length === 0) return;
 
-        const videoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
+        const videoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
         
         viewfinder.srcObject = null;
         viewfinder.src = URL.createObjectURL(videoBlob);
         viewfinder.muted = false; 
         
-        // Force hardware inline playback setup
         viewfinder.setAttribute('playsinline', 'true');
         viewfinder.setAttribute('webkit-playsinline', 'true');
         
@@ -234,8 +229,8 @@
         setupTimelineLocking();
       };
 
-      // Process in small slices to eliminate lagging memory spikes
-      mediaRecorder.start(100); 
+      // FIXED: Removed time-slicing to protect native Android file integrity
+      mediaRecorder.start(); 
       refVideo.play();
       
       recBadge.style.display = "block";
@@ -261,20 +256,22 @@
     }
 
     function setupTimelineLocking() {
-      refVideo.addEventListener('timeupdate', () => {
+      // FIXED: Only sync timelines when manual scrubbing/seeking happens to completely prevent the playback loop glitch
+      refVideo.addEventListener('seeking', () => {
         if (isSyncing) return;
         isSyncing = true;
         viewfinder.currentTime = refVideo.currentTime;
         isSyncing = false;
       });
 
-      viewfinder.addEventListener('timeupdate', () => {
+      viewfinder.addEventListener('seeking', () => {
         if (isSyncing) return;
         isSyncing = true;
         refVideo.currentTime = viewfinder.currentTime;
         isSyncing = false;
       });
 
+      // Simple sync drift catch layout when paused or played
       refVideo.addEventListener('play', () => { viewfinder.play(); actionBtn.innerText = "Pause Review"; });
       refVideo.addEventListener('pause', () => { viewfinder.pause(); actionBtn.innerText = "Play Review"; });
       viewfinder.addEventListener('play', () => { refVideo.play(); actionBtn.innerText = "Pause Review"; });
