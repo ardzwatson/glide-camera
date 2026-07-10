@@ -3,30 +3,48 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dual View Lesson</title>
   <style>
-    body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+    body, html { margin: 0; padding: 16px; width: 100%; height: 100%; box-sizing: border-box; background: #111; color: white; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    .container { display: flex; flex-direction: column; gap: 16px; max-width: 500px; margin: 0 auto; height: 100%; }
+    .box { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
     video { width: 100%; height: 100%; object-fit: cover; }
+    iframe { width: 100%; height: 100%; border: none; }
+    .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; }
   </style>
 </head>
 <body>
-  <!-- The live feed video element -->
-  <video id="viewfinder" autoplay playsinline muted></video>
+
+  <div class="container">
+    <!-- Top Box: The YouTube Video -->
+    <div class="box">
+      <div class="label">WATCH LESSON</div>
+      <iframe src="https://www.youtube.com/embed/I140iNpx1xM?rel=0&playsinline=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+
+    <!-- Bottom Box: The Live Camera Viewfinder (Selfie View) -->
+    <div class="box">
+      <div class="label">YOU (SELFIE FEED)</div>
+      <video id="viewfinder" autoplay playsinline muted></video>
+    </div>
+  </div>
 
   <script>
     async function startCamera() {
       try {
-        // Request the back camera specifically for mobile phones
+        // Request the front-facing camera for the selfie view
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" } },
+          video: { facingMode: "user" },
           audio: false
         });
         const videoElement = document.getElementById('viewfinder');
         videoElement.srcObject = stream;
       } catch (err) {
-        console.error("Camera access denied or unsupported:", err);
+        alert("To see yourself alongside the video, please tap 'Allow' when prompted for camera access.");
+        console.error("Camera access issue:", err);
       }
     }
-    // Start automatically when the iframe loads
+    // Start camera immediately on page load
     window.addEventListener('DOMContentLoaded', startCamera);
   </script>
 </body>
