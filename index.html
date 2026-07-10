@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Sync Performance Review (V10)</title>
+  <title>Sync Performance Review (V11)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -20,11 +20,14 @@
     }
 
     .box { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
-    video { width: 100%; height: 100%; object-fit: cover; background: #000; transition: transform 0.1s ease-out; }
+    
+    /* FIX: The wrapper holds the zoom transform, letting the video native controls stay scaled relative to it */
+    .viewfinder-wrapper { width: 100%; height: 100%; position: relative; overflow: hidden; transition: transform 0.1s ease-out; transform-origin: center center; }
+    video { width: 100%; height: 100%; object-fit: cover; background: #000; }
     
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; }
     
-    /* RESTORED: Zoom Slider with smooth opacity transitions */
+    /* Zoom Slider overlay configuration */
     .zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); opacity: 1; transition: opacity 0.3s ease; }
     .zoom-container.fade-out { opacity: 0; pointer-events: none; }
     .zoom-container label { font-size: 10px; font-weight: bold; font-family: monospace; min-width: 24px; text-align: center; color: #007aff; }
@@ -37,10 +40,8 @@
     button:active { background: #0056b3; }
     button:disabled { background: #444; color: #888; cursor: not-allowed; }
     
-    /* Version Label Tracking Layout */
     .version-tag { color: #666; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: monospace; }
     
-    /* Special Context Dynamic Button Colors */
     .btn-recording { background: #ff453a !important; }
     .btn-recording:active { background: #ff3b30 !important; }
     
@@ -49,11 +50,9 @@
     #resetBtn.danger-active { background: #ff3b30; }
     #resetBtn.danger-active:active { background: #b3241f; }
 
-    /* Overlay Countdown Text */
     .countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: #fff; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
     .countdown-overlay.show { opacity: 1; }
     
-    /* Live Status Indicators */
     .rec-indicator { position: absolute; top: 12px; right: 12px; background: #ff3b30; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; animation: pulse 1s infinite alternate; display: none; z-index: 10; }
     @keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
   </style>
@@ -71,9 +70,11 @@
       <div class="label" id="streamLabel">YOU (LIVE CAM)</div>
       <div class="rec-indicator" id="recBadge">● RECORDING</div>
       
-      <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
+      <!-- FIX: Video is isolated within a layout wrapper that preserves structural zoom ratios safely -->
+      <div class="viewfinder-wrapper" id="vfWrapper">
+        <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
+      </div>
       
-      <!-- RESTORED: Zoom Interface overlay with conditional interaction -->
       <div class="zoom-container" id="zoomUi">
         <input type="range" id="zoomSlider" class="zoom-slider" min="1" max="2" step="0.1" value="1">
         <label id="zoomLabel">1.0x</label>
@@ -84,12 +85,13 @@
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
-    <div class="version-tag">Version 10</div>
+    <div class="version-tag">Version 11</div>
   </div>
 
   <script>
     const refVideo = document.getElementById('refVideo');
     const viewfinder = document.getElementById('viewfinder');
+    const vfWrapper = document.getElementById('vfWrapper');
     const actionBtn = document.getElementById('actionBtn');
     const resetBtn = document.getElementById('resetBtn');
     const countdown = document.getElementById('countdown');
@@ -97,7 +99,6 @@
     const streamLabel = document.getElementById('streamLabel');
     const cameraBox = document.getElementById('cameraBox');
     
-    // Zoom Elements
     const zoomSlider = document.getElementById('zoomSlider');
     const zoomLabel = document.getElementById('zoomLabel');
     const zoomUi = document.getElementById('zoomUi');
@@ -110,6 +111,7 @@
     let loopInterval = null;
     let activeScrubSource = null; 
     let zoomFadeTimeout = null;
+    let chosenScale = 1; // Track selected zoom across states
 
     async function initCamera() {
       try {
@@ -118,16 +120,15 @@
           audio: true 
         });
         viewfinder.srcObject = liveStream;
-        resetZoomFadeTimer(); // Start the fade timer for the initial load
+        resetZoomFadeTimer();
       } catch (err) {
         alert("Camera and Microphone access required to sync performance.");
         console.error(err);
       }
     }
 
-    // RESTORED: Inactivity Fade-Out Management (3 seconds)
     function resetZoomFadeTimer() {
-      if (isReviewMode) return; // Never run fade loops in review mode
+      if (isReviewMode) return; 
       
       zoomUi.classList.remove('fade-out');
       clearTimeout(zoomFadeTimeout);
@@ -139,14 +140,14 @@
       }, 3000);
     }
 
-    // Awaken slider UI on box movement/touches
     cameraBox.addEventListener('mousemove', resetZoomFadeTimer);
     cameraBox.addEventListener('touchstart', resetZoomFadeTimer);
 
+    // FIX: Apply transform scaling strictly to the parent structural wrapper
     zoomSlider.addEventListener('input', (e) => {
-      const scaleValue = e.target.value;
-      zoomLabel.innerText = `${parseFloat(scaleValue).toFixed(1)}x`;
-      viewfinder.style.transform = `scale(${scaleValue})`;
+      chosenScale = e.target.value;
+      zoomLabel.innerText = `${parseFloat(chosenScale).toFixed(1)}x`;
+      vfWrapper.style.transform = `scale(${chosenScale})`;
       resetZoomFadeTimer();
     });
 
@@ -197,6 +198,7 @@
       isReviewMode = false;
       recordedChunks = [];
       activeScrubSource = null;
+      chosenScale = 1;
       
       refVideo.onseeking = null;
       refVideo.onseeked = null;
@@ -219,10 +221,10 @@
       viewfinder.muted = true;
       viewfinder.controls = false;
       
-      // Reset zoom configurations safely to zero bounds
+      // Clean system reset to zero bounds
       zoomSlider.value = 1;
       zoomLabel.innerText = "1.0x";
-      viewfinder.style.transform = "scale(1)";
+      vfWrapper.style.transform = "scale(1)";
       zoomUi.style.display = "flex";
       resetZoomFadeTimer();
       
@@ -288,8 +290,8 @@
         viewfinder.setAttribute('playsinline', 'true');
         viewfinder.setAttribute('webkit-playsinline', 'true');
         
-        // CRITICAL BUG FIX: Reset CSS transform scaling instantly so the review timelines aren't broken or pushed off-screen
-        viewfinder.style.transform = "scale(1)";
+        // FIX: Keep the wrapper zoomed into the exact value selected by the user
+        vfWrapper.style.transform = `scale(${chosenScale})`;
         zoomUi.style.display = "none";
 
         viewfinder.controls = true; 
