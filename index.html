@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Sync Performance Review (V12)</title>
+  <title>Sync Performance Review (V13)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -21,18 +21,15 @@
 
     .box { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
     
-    /* FIX: The wrapper handles the overflow clipping, but stays 100% stable */
-    .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; }
+    /* The container stays fixed and clips the oversized zoomed video frame safely */
+    .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
     
-    /* FIX: Zoom ONLY the active stream frame, leaving native controls unscaled at the bottom layout layer */
+    /* Default layout state */
     video { width: 100%; height: 100%; object-fit: cover; background: #000; }
-    
-    /* This rule applies scale cleanly to the video element without forcing controls outside the visible viewport window */
-    .zoomed-frame { transform-origin: center center; transition: transform 0.1s ease-out; }
     
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; }
     
-    /* Zoom UI Layout overlay */
+    /* Zoom UI Slider Overlay */
     .zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); opacity: 1; transition: opacity 0.3s ease; }
     .zoom-container.fade-out { opacity: 0; pointer-events: none; }
     .zoom-container label { font-size: 10px; font-weight: bold; font-family: monospace; min-width: 24px; text-align: center; color: #007aff; }
@@ -76,8 +73,8 @@
       <div class="rec-indicator" id="recBadge">● RECORDING</div>
       
       <div class="viewfinder-container">
-        <!-- FIX: Zoom scale is attached directly to the frame class, but managed via CSS so standard media interface controls sit naturally inside the viewport container bounds -->
-        <video id="viewfinder" class="zoomed-frame" autoplay playsinline webkit-playsinline muted></video>
+        <!-- FIX: We zoom into the video track using clean pixel dimension scale instead of a CSS transform wrapper -->
+        <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
       </div>
       
       <div class="zoom-container" id="zoomUi">
@@ -90,7 +87,7 @@
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
-    <div class="version-tag">Version 12</div>
+    <div class="version-tag">Version 13</div>
   </div>
 
   <script>
@@ -147,11 +144,17 @@
     cameraBox.addEventListener('mousemove', resetZoomFadeTimer);
     cameraBox.addEventListener('touchstart', resetZoomFadeTimer);
 
-    // FIX: Scale the track view safely
+    // FIX: Apply sizing percentages natively instead of CSS transforms so the layout system exposes standard controls
+    function applyDimensionZoom(scale) {
+      const percentage = scale * 100;
+      viewfinder.style.width = `${percentage}%`;
+      viewfinder.style.height = `${percentage}%`;
+    }
+
     zoomSlider.addEventListener('input', (e) => {
-      chosenScale = e.target.value;
-      zoomLabel.innerText = `${parseFloat(chosenScale).toFixed(1)}x`;
-      viewfinder.style.transform = `scale(${chosenScale})`;
+      chosenScale = parseFloat(e.target.value);
+      zoomLabel.innerText = `${chosenScale.toFixed(1)}x`;
+      applyDimensionZoom(chosenScale);
       resetZoomFadeTimer();
     });
 
@@ -210,6 +213,8 @@
       viewfinder.onseeking = null;
       viewfinder.onseeked = null;
       viewfinder.onended = null;
+      viewfinder.onplay = null;
+      viewfinder.onpause = null;
       
       refVideo.pause();
       refVideo.currentTime = 0;
@@ -225,10 +230,11 @@
       viewfinder.muted = true;
       viewfinder.controls = false;
       
-      // Clean system reset to standard limits
+      // Clean system reset to initial values
       zoomSlider.value = 1;
       zoomLabel.innerText = "1.0x";
-      viewfinder.style.transform = "scale(1)";
+      viewfinder.style.width = "100%";
+      viewfinder.style.height = "100%";
       zoomUi.style.display = "flex";
       resetZoomFadeTimer();
       
@@ -294,11 +300,10 @@
         viewfinder.setAttribute('playsinline', 'true');
         viewfinder.setAttribute('webkit-playsinline', 'true');
         
-        // FIX: Re-apply the zoom scale value directly to the video element style matrix
-        viewfinder.style.transform = `scale(${chosenScale})`;
+        // FIX: Keep user zoom intact natively by applying sizing variables directly
+        applyDimensionZoom(chosenScale);
         zoomUi.style.display = "none";
 
-        // Enable standard timeline scrubbing tracks safely
         viewfinder.controls = true; 
         refVideo.controls = true; 
 
@@ -353,6 +358,33 @@
     }
 
     function setupManualScrubSync() {
+      // FIX: Capture native play/pause touches on the videos to prevent sync drift
+      viewfinder.onplay = () => {
+        if (isReviewMode && refVideo.paused) {
+          refVideo.play();
+          actionBtn.innerText = "Pause Review";
+        }
+      };
+      viewfinder.onpause = () => {
+        if (isReviewMode && !refVideo.paused) {
+          refVideo.pause();
+          actionBtn.innerText = "Play Review";
+        }
+      };
+      
+      refVideo.onplay = () => {
+        if (isReviewMode && viewfinder.paused) {
+          viewfinder.play();
+          actionBtn.innerText = "Pause Review";
+        }
+      };
+      refVideo.onpause = () => {
+        if (isReviewMode && !viewfinder.paused) {
+          viewfinder.pause();
+          actionBtn.innerText = "Play Review";
+        }
+      };
+
       refVideo.onseeking = () => {
         if (!isReviewMode) return;
         if (activeScrubSource === null) activeScrubSource = 'reference';
