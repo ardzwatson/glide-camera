@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Sync Performance Review (V11)</title>
+  <title>Sync Performance Review (V12)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -21,20 +21,25 @@
 
     .box { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
     
-    /* FIX: The wrapper holds the zoom transform, letting the video native controls stay scaled relative to it */
-    .viewfinder-wrapper { width: 100%; height: 100%; position: relative; overflow: hidden; transition: transform 0.1s ease-out; transform-origin: center center; }
+    /* FIX: The wrapper handles the overflow clipping, but stays 100% stable */
+    .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; }
+    
+    /* FIX: Zoom ONLY the active stream frame, leaving native controls unscaled at the bottom layout layer */
     video { width: 100%; height: 100%; object-fit: cover; background: #000; }
+    
+    /* This rule applies scale cleanly to the video element without forcing controls outside the visible viewport window */
+    .zoomed-frame { transform-origin: center center; transition: transform 0.1s ease-out; }
     
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; }
     
-    /* Zoom Slider overlay configuration */
+    /* Zoom UI Layout overlay */
     .zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); opacity: 1; transition: opacity 0.3s ease; }
     .zoom-container.fade-out { opacity: 0; pointer-events: none; }
     .zoom-container label { font-size: 10px; font-weight: bold; font-family: monospace; min-width: 24px; text-align: center; color: #007aff; }
     .zoom-slider { -webkit-appearance: none; appearance: none; width: 100px; height: 4px; background: #444; border-radius: 2px; outline: none; }
     .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #007aff; cursor: pointer; }
 
-    /* Control Footer Setup */
+    /* Controls Footer Layout Setup */
     .controls-footer { height: 60px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 10px; position: relative; }
     button { background: #007aff; color: white; border: none; padding: 12px 24px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s, opacity 0.2s; }
     button:active { background: #0056b3; }
@@ -70,9 +75,9 @@
       <div class="label" id="streamLabel">YOU (LIVE CAM)</div>
       <div class="rec-indicator" id="recBadge">● RECORDING</div>
       
-      <!-- FIX: Video is isolated within a layout wrapper that preserves structural zoom ratios safely -->
-      <div class="viewfinder-wrapper" id="vfWrapper">
-        <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
+      <div class="viewfinder-container">
+        <!-- FIX: Zoom scale is attached directly to the frame class, but managed via CSS so standard media interface controls sit naturally inside the viewport container bounds -->
+        <video id="viewfinder" class="zoomed-frame" autoplay playsinline webkit-playsinline muted></video>
       </div>
       
       <div class="zoom-container" id="zoomUi">
@@ -85,13 +90,12 @@
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
-    <div class="version-tag">Version 11</div>
+    <div class="version-tag">Version 12</div>
   </div>
 
   <script>
     const refVideo = document.getElementById('refVideo');
     const viewfinder = document.getElementById('viewfinder');
-    const vfWrapper = document.getElementById('vfWrapper');
     const actionBtn = document.getElementById('actionBtn');
     const resetBtn = document.getElementById('resetBtn');
     const countdown = document.getElementById('countdown');
@@ -111,7 +115,7 @@
     let loopInterval = null;
     let activeScrubSource = null; 
     let zoomFadeTimeout = null;
-    let chosenScale = 1; // Track selected zoom across states
+    let chosenScale = 1;
 
     async function initCamera() {
       try {
@@ -143,11 +147,11 @@
     cameraBox.addEventListener('mousemove', resetZoomFadeTimer);
     cameraBox.addEventListener('touchstart', resetZoomFadeTimer);
 
-    // FIX: Apply transform scaling strictly to the parent structural wrapper
+    // FIX: Scale the track view safely
     zoomSlider.addEventListener('input', (e) => {
       chosenScale = e.target.value;
       zoomLabel.innerText = `${parseFloat(chosenScale).toFixed(1)}x`;
-      vfWrapper.style.transform = `scale(${chosenScale})`;
+      viewfinder.style.transform = `scale(${chosenScale})`;
       resetZoomFadeTimer();
     });
 
@@ -221,10 +225,10 @@
       viewfinder.muted = true;
       viewfinder.controls = false;
       
-      // Clean system reset to zero bounds
+      // Clean system reset to standard limits
       zoomSlider.value = 1;
       zoomLabel.innerText = "1.0x";
-      vfWrapper.style.transform = "scale(1)";
+      viewfinder.style.transform = "scale(1)";
       zoomUi.style.display = "flex";
       resetZoomFadeTimer();
       
@@ -290,10 +294,11 @@
         viewfinder.setAttribute('playsinline', 'true');
         viewfinder.setAttribute('webkit-playsinline', 'true');
         
-        // FIX: Keep the wrapper zoomed into the exact value selected by the user
-        vfWrapper.style.transform = `scale(${chosenScale})`;
+        // FIX: Re-apply the zoom scale value directly to the video element style matrix
+        viewfinder.style.transform = `scale(${chosenScale})`;
         zoomUi.style.display = "none";
 
+        // Enable standard timeline scrubbing tracks safely
         viewfinder.controls = true; 
         refVideo.controls = true; 
 
