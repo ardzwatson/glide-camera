@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Sync Performance Review</title>
+  <title>Sync Performance Review (V9)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -20,10 +20,16 @@
     }
 
     .box { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
-    video { width: 100%; height: 100%; object-fit: cover; background: #000; }
+    video { width: 100%; height: 100%; object-fit: cover; background: #000; transition: transform 0.1s ease-out; }
     
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; }
     
+    /* RESTORED: Zoom Slider Overlay Design */
+    .zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+    .zoom-container label { font-size: 10px; font-weight: bold; font-family: monospace; min-width: 24px; text-align: center; color: #007aff; }
+    .zoom-slider { -webkit-appearance: none; appearance: none; width: 100px; height: 4px; background: #444; border-radius: 2px; outline: none; }
+    .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #007aff; cursor: pointer; }
+
     /* Control Footer Setup */
     .controls-footer { height: 60px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 10px; position: relative; }
     button { background: #007aff; color: white; border: none; padding: 12px 24px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s, opacity 0.2s; }
@@ -63,14 +69,21 @@
     <div class="box" id="cameraBox">
       <div class="label" id="streamLabel">YOU (LIVE CAM)</div>
       <div class="rec-indicator" id="recBadge">● RECORDING</div>
+      
       <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
+      
+      <!-- RESTORED: Dynamic Zoom Interface overlay -->
+      <div class="zoom-container" id="zoomUi">
+        <input type="range" id="zoomSlider" class="zoom-slider" min="1" max="2" step="0.1" value="1">
+        <label id="zoomLabel">1.0x</label>
+      </div>
     </div>
   </div>
 
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
-    <div class="version-tag">Version 8</div>
+    <div class="version-tag">Version 9</div>
   </div>
 
   <script>
@@ -81,6 +94,11 @@
     const countdown = document.getElementById('countdown');
     const recBadge = document.getElementById('recBadge');
     const streamLabel = document.getElementById('streamLabel');
+    
+    // Zoom Elements
+    const zoomSlider = document.getElementById('zoomSlider');
+    const zoomLabel = document.getElementById('zoomLabel');
+    const zoomUi = document.getElementById('zoomUi');
 
     let mediaRecorder = null;
     let recordedChunks = [];
@@ -102,6 +120,13 @@
         console.error(err);
       }
     }
+
+    // RESTORED: Real-time scaling logic applied cleanly to the target canvas bounds
+    zoomSlider.addEventListener('input', (e) => {
+      const scaleValue = e.target.value;
+      zoomLabel.innerText = `${parseFloat(scaleValue).toFixed(1)}x`;
+      viewfinder.style.transform = `scale(${scaleValue})`;
+    });
 
     actionBtn.addEventListener('click', () => {
       if (!isRecordingMode && !isReviewMode) {
@@ -129,7 +154,6 @@
       actionBtn.innerText = "Play Review";
     }
 
-    // Centered Loop Trigger Execution
     function triggerSynchronizedLoop() {
       pauseBoth();
       refVideo.currentTime = 0;
@@ -167,6 +191,12 @@
       viewfinder.srcObject = liveStream;
       viewfinder.muted = true;
       viewfinder.controls = false;
+      
+      // Reset zoom settings cleanly
+      zoomSlider.value = 1;
+      zoomLabel.innerText = "1.0x";
+      viewfinder.style.transform = "scale(1)";
+      zoomUi.style.display = "flex";
       
       recBadge.style.display = "none";
       streamLabel.innerText = "YOU (LIVE CAM)";
@@ -231,6 +261,9 @@
         
         viewfinder.controls = true; 
         refVideo.controls = true; 
+
+        // Hide zoom UI during review to keep interface clean for timeline manipulation
+        zoomUi.style.display = "none";
 
         streamLabel.innerText = "YOU (RECORDED REVIEW)";
         isReviewMode = true;
@@ -303,7 +336,6 @@
         if (activeScrubSource === 'reference') activeScrubSource = null;
       };
 
-      // FIXED: Hard event handlers added directly to native media properties to catch the first pass boundary
       refVideo.onended = () => {
         if (isReviewMode) triggerSynchronizedLoop();
       };
@@ -319,7 +351,6 @@
       loopInterval = setInterval(() => {
         if (!isReviewMode || refVideo.paused || activeScrubSource !== null) return;
 
-        // FIXED: Added check for 'viewfinder.ended' or absolute ceiling if browser duration calculation drifts
         const refEnded = refVideo.currentTime >= refVideo.duration - 0.15 || refVideo.ended;
         const viewEnded = (viewfinder.duration && viewfinder.currentTime >= viewfinder.duration - 0.15) || viewfinder.ended;
 
