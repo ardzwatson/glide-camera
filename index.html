@@ -2,164 +2,31 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Landscape Split View</title>
+  
+  <!-- Add these 3 tags to remove the top URL bar when added to home screen -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <style>
+    /* Keep your existing CSS styling blocks exactly the same here */
     body, html { margin: 0; padding: 12px; width: 100%; height: 100%; box-sizing: border-box; background: #111; color: white; font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; }
-    
-    /* Swap order in portrait: Camera (Box 2) on top, YouTube (Box 1) on bottom */
     .container { display: flex; flex-direction: column-reverse; gap: 12px; width: 100%; height: 100%; }
-    
-    /* When phone flips horizontally (Landscape) */
     @media (orientation: landscape) {
       .container { flex-direction: row; }
       .box { height: 100% !important; width: 50% !important; aspect-ratio: auto !important; }
-      /* In landscape, restore traditional left-to-right order */
       .box-youtube { order: 1; }
       .box-camera { order: 2; }
     }
-
     .box { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
     iframe, video { width: 100%; height: 100%; border: none; object-fit: cover; }
-    
-    /* Labels */
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; }
-    
-    /* Smart Zoom Panel UI with dynamic opacity transition */
-    .zoom-controls { 
-      position: absolute; 
-      bottom: 12px; 
-      left: 50%; 
-      transform: translateX(-50%); 
-      background: rgba(0,0,0,0.85); 
-      padding: 8px 16px; 
-      border-radius: 20px; 
-      display: flex; 
-      align-items: center; 
-      gap: 10px; 
-      z-index: 20; 
-      backdrop-filter: blur(4px);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.4s ease, transform 0.3s ease;
-    }
-    
-    /* Active class when UI is visible */
-    .zoom-controls.visible {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    
+    .zoom-controls { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); padding: 8px 16px; border-radius: 20px; display: flex; align-items: center; gap: 10px; z-index: 20; backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: opacity 0.4s ease, transform 0.3s ease; }
+    .zoom-controls.visible { opacity: 1; pointer-events: auto; }
     .zoom-controls input { width: 110px; accent-color: #007aff; cursor: pointer; }
     .zoom-controls span { font-size: 11px; font-weight: bold; min-width: 32px; text-align: center; }
   </style>
 </head>
-<body>
-
-  <div class="container">
-    <!-- YouTube Video Box -->
-    <div class="box box-youtube">
-      <div class="label">WATCH LESSON</div>
-      <iframe src="https://www.youtube.com/embed/I140iNpx1xM?rel=0&playsinline=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-    </div>
-
-    <!-- Camera Feed Box (Now on top in Portrait layout) -->
-    <div class="box box-camera" id="cameraBox">
-      <div class="label">YOU (SELFIE FEED)</div>
-      <video id="viewfinder" autoplay playsinline muted></video>
-      
-      <!-- Hidden Zoom UI Container -->
-      <div class="zoom-controls" id="zoomPanel">
-        <span>Zoom</span>
-        <input type="range" id="zoomSlider" min="1" max="3" step="0.1" value="1">
-        <span id="zoomVal">1.0x</span>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    let activeStream = null;
-    let uiTimeout = null;
-
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" },
-          audio: false
-        });
-        activeStream = stream;
-        document.getElementById('viewfinder').srcObject = stream;
-
-        setupZoomControls();
-        triggerTemporaryUI(); // Show zoom panel for 3 seconds on load
-      } catch (err) {
-        alert("Please enable camera access to utilize the selfie viewfinder frame.");
-        console.error(err);
-      }
-    }
-
-    function showUI() {
-      const panel = document.getElementById('zoomPanel');
-      panel.classList.add('visible');
-      
-      // Clear any pending hide timers
-      if (uiTimeout) clearTimeout(uiTimeout);
-      
-      // Start counting down 3 seconds to hide it again
-      uiTimeout = setTimeout(() => {
-        panel.classList.remove('visible');
-      }, 3000);
-    }
-
-    function triggerTemporaryUI() {
-      showUI();
-    }
-
-    function setupZoomControls() {
-      const slider = document.getElementById('zoomSlider');
-      const textVal = document.getElementById('zoomVal');
-      const videoElement = document.getElementById('viewfinder');
-      const cameraBox = document.getElementById('cameraBox');
-      const videoTrack = activeStream.getVideoTracks()[0];
-      const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
-
-      // Open UI on click/tap of the camera box workspace
-      cameraBox.addEventListener('click', (e) => {
-        showUI();
-      });
-
-      // Keep UI alive while slider is being actively adjusted
-      slider.addEventListener('input', () => {
-        showUI(); 
-      });
-
-      // Strategy 1: Hardware Zoom
-      if (capabilities.zoom) {
-        slider.min = capabilities.zoom.min;
-        slider.max = capabilities.zoom.max;
-        slider.step = capabilities.zoom.step || 0.1;
-        slider.value = capabilities.zoom.min;
-        textVal.innerText = Number(slider.value).toFixed(1) + 'x';
-
-        slider.addEventListener('input', async () => {
-          textVal.innerText = Number(slider.value).toFixed(1) + 'x';
-          try {
-            await videoTrack.applyConstraints({ advanced: [{ zoom: parseFloat(slider.value) }] });
-          } catch (e) { console.error(e); }
-        });
-      } 
-      // Strategy 2: Smooth CSS Zoom Fallback (Highly compatible with iOS Safari)
-      else {
-        slider.addEventListener('input', () => {
-          const scaleFactor = slider.value;
-          textVal.innerText = Number(scaleFactor).toFixed(1) + 'x';
-          videoElement.style.transform = `scale(${scaleFactor})`;
-          videoElement.style.transformOrigin = 'center center';
-        });
-      }
-    }
-
-    window.addEventListener('DOMContentLoaded', startCamera);
-  </script>
-</body>
-</html>
+<!-- Keep your exact body and javascript blocks completely untouched down here -->
