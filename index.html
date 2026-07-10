@@ -2,39 +2,59 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <!-- FIX: Added viewport-fit=cover to force the app behind device notches and status bars -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V16)</title>
+  <title>Sync Performance Review (V17)</title>
   
-  <!-- Web App Manifest Meta tags to force browser title bar disappearance on mobile -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <!-- Makes status bar elements overlay transparently over our app layout background -->
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <style>
     body, html { 
       margin: 0; 
-      /* FIX: Use env() safe area padding to handle hardware screen notches cleanly while staying edge-to-edge */
-      padding: env(safe-area-inset-top, 12px) env(safe-area-inset-right, 12px) env(safe-area-inset-bottom, 12px) env(safe-area-inset-left, 12px); 
+      /* FIX: Changed 100% height to 100dvh (Dynamic Viewport Height) to actively adapt to mobile system bars */
+      height: 100dvh; 
       width: 100%; 
-      height: 100%; 
       box-sizing: border-box; 
       background: #111; 
       color: white; 
       font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
       overflow: hidden; 
+      display: flex;
+      flex-direction: column;
+      /* FIX: Added safe area bottom padding to protect buttons from hardware home bars */
+      padding: env(safe-area-inset-top, 8px) 12px calc(env(safe-area-inset-bottom, 0px) + 8px) 12px;
     }
     
-    /* FIX: Recalculated structural containers using dynamic viewport sizes to maximize layout real estate */
-    .container { display: flex; flex-direction: column; gap: 12px; width: 100%; height: calc(100vh - 120px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+    /* FIX: Re-architected container to use flex-grow so it perfectly fills the room between headers and footers without overflow */
+    .container { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 12px; 
+      width: 100%; 
+      flex-grow: 1;
+      min-height: 0; /* Prevents container from blowing past flex boundaries */
+    }
     
     @media (orientation: landscape) {
       .container { flex-direction: row; }
       .box { height: 100% !important; width: 50% !important; aspect-ratio: auto !important; }
     }
 
-    .box { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
+    /* FIX: Adjusted box styling to flex flexibly inside its workspace */
+    .box { 
+      position: relative; 
+      width: 100%; 
+      flex-grow: 1;
+      flex-shrink: 1;
+      min-height: 0;
+      border-radius: 12px; 
+      overflow: hidden; 
+      background: #000; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5); 
+      display: flex; 
+      flex-direction: column; 
+    }
     
     .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; }
     
@@ -48,18 +68,20 @@
     .zoom-slider { -webkit-appearance: none; appearance: none; width: 100px; height: 4px; background: #444; border-radius: 2px; outline: none; }
     .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #007aff; cursor: pointer; }
 
-    .timeline-footer { width: 100%; height: 40px; display: none; align-items: center; gap: 12px; background: rgba(0,0,0,0.4); padding: 0 16px; box-sizing: border-box; border-radius: 8px; margin-top: 8px; }
+    /* FIX: Tightened padding and heights of layout elements to give screens maximal breathing room */
+    .timeline-footer { width: 100%; height: 36px; display: none; align-items: center; gap: 12px; background: rgba(0,0,0,0.4); padding: 0 12px; box-sizing: border-box; border-radius: 8px; margin-top: 8px; flex-shrink: 0; }
     .timeline-footer.show { display: flex; }
     .timeline-slider { flex-grow: 1; -webkit-appearance: none; appearance: none; height: 6px; background: #333; border-radius: 3px; outline: none; }
     .timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #007aff; cursor: pointer; border: 2px solid white; }
     .time-display { font-family: monospace; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
 
-    .controls-footer { height: 50px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 6px; position: relative; }
-    button { background: #007aff; color: white; border: none; padding: 10px 20px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+    /* FIX: Stabilized controls-footer structure with explicit flex positioning to prevent drop-off */
+    .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
+    button { background: #007aff; color: white; border: none; padding: 12px 24px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
     button:active { background: #0056b3; }
     button:disabled { background: #444; color: #888; cursor: not-allowed; }
     
-    .version-tag { color: #556; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: monospace; position: absolute; right: 8px; }
+    .version-tag { color: #556; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: monospace; position: absolute; right: 4px; }
     
     .btn-recording { background: #ff453a !important; }
     .btn-recording:active { background: #ff3b30 !important; }
@@ -108,7 +130,7 @@
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
-    <div class="version-tag">Version 16</div>
+    <div class="version-tag">V17</div>
   </div>
 
   <script>
