@@ -3,48 +3,105 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dual View Lesson</title>
+  <title>Landscape Split View</title>
   <style>
-    body, html { margin: 0; padding: 16px; width: 100%; height: 100%; box-sizing: border-box; background: #111; color: white; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-    .container { display: flex; flex-direction: column; gap: 16px; max-width: 500px; margin: 0 auto; height: 100%; }
-    .box { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-    video { width: 100%; height: 100%; object-fit: cover; }
-    iframe { width: 100%; height: 100%; border: none; }
-    .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; }
+    body, html { margin: 0; padding: 12px; width: 100%; height: 100%; box-sizing: border-box; background: #111; color: white; font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; }
+    
+    /* Responsive Split Container */
+    .container { display: flex; flex-direction: column; gap: 12px; width: 100%; height: 100%; }
+    
+    /* When phone flips horizontally (Landscape) or on desktop layout */
+    @media (orientation: landscape) {
+      .container { flex-direction: row; }
+      .box { height: 100% !important; width: 50% !important; aspect-ratio: auto !important; }
+    }
+
+    .box { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
+    iframe, video { width: 100%; height: 100%; border: none; object-fit: cover; }
+    
+    /* Control Panel Overlays */
+    .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; }
+    .zoom-controls { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 10px; z-index: 20; backdrop-filter: blur(4px); }
+    .zoom-controls input { width: 100px; accent-color: #007aff; cursor: pointer; }
+    .zoom-controls span { font-size: 11px; font-weight: bold; min-width: 30px; text-align: center; }
   </style>
 </head>
 <body>
 
   <div class="container">
-    <!-- Top Box: The YouTube Video -->
+    <!-- Left Box (Landscape) / Top Box (Portrait): YouTube Video -->
     <div class="box">
       <div class="label">WATCH LESSON</div>
       <iframe src="https://www.youtube.com/embed/I140iNpx1xM?rel=0&playsinline=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
     </div>
 
-    <!-- Bottom Box: The Live Camera Viewfinder (Selfie View) -->
+    <!-- Right Box (Landscape) / Bottom Box (Portrait): Camera Feed + Zoom -->
     <div class="box">
       <div class="label">YOU (SELFIE FEED)</div>
       <video id="viewfinder" autoplay playsinline muted></video>
+      
+      <!-- Zoom Control Slider Component -->
+      <div class="zoom-controls">
+        <span>Zoom</span>
+        <input type="range" id="zoomSlider" min="1" max="3" step="0.1" value="1">
+        <block><span id="zoomVal">1.0x</span></block>
+      </div>
     </div>
   </div>
 
   <script>
+    let activeStream = null;
+
     async function startCamera() {
       try {
-        // Request the front-facing camera for the selfie view
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "user" },
           audio: false
         });
+        activeStream = stream;
         const videoElement = document.getElementById('viewfinder');
         videoElement.srcObject = stream;
+
+        setupZoomControls();
       } catch (err) {
-        alert("To see yourself alongside the video, please tap 'Allow' when prompted for camera access.");
-        console.error("Camera access issue:", err);
+        alert("Please enable camera access to utilize the selfie viewfinder frame.");
+        console.error(err);
       }
     }
-    // Start camera immediately on page load
+
+    function setupZoomControls() {
+      const slider = document.getElementById('zoomSlider');
+      const textVal = document.getElementById('zoomVal');
+      const videoElement = document.getElementById('viewfinder');
+      const videoTrack = activeStream.getVideoTracks()[0];
+      const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+
+      // Strategy 1: Attempt Native Digital Hardware Zoom (Supported mostly on Android/Chrome)
+      if (capabilities.zoom) {
+        slider.min = capabilities.zoom.min;
+        slider.max = capabilities.zoom.max;
+        slider.step = capabilities.zoom.step || 0.1;
+        slider.value = capabilities.zoom.min;
+        textVal.innerText = Number(slider.value).toFixed(1) + 'x';
+
+        slider.addEventListener('input', async () => {
+          textVal.innerText = Number(slider.value).toFixed(1) + 'x';
+          try {
+            await videoTrack.applyConstraints({ advanced: [{ zoom: parseFloat(slider.value) }] });
+          } catch (e) { console.error(e); }
+        });
+      } 
+      // Strategy 2: Smooth CSS Fallback Scaling (Guaranteed universal support for iPhone/iOS Safari)
+      else {
+        slider.addEventListener('input', () => {
+          const scaleFactor = slider.value;
+          textVal.innerText = Number(scaleFactor).toFixed(1) + 'x';
+          videoElement.style.transform = `scale(${scaleFactor})`;
+          videoElement.style.transformOrigin = 'center center';
+        });
+      }
+    }
+
     window.addEventListener('DOMContentLoaded', startCamera);
   </script>
 </body>
