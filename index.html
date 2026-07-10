@@ -2,17 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Sync Performance Review (V15)</title>
+  <!-- FIX: Added viewport-fit=cover to force the app behind device notches and status bars -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Sync Performance Review (V16)</title>
   
+  <!-- Web App Manifest Meta tags to force browser title bar disappearance on mobile -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
+  <!-- Makes status bar elements overlay transparently over our app layout background -->
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <style>
-    body, html { margin: 0; padding: 12px; width: 100%; height: 100%; box-sizing: border-box; background: #111; color: white; font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; }
+    body, html { 
+      margin: 0; 
+      /* FIX: Use env() safe area padding to handle hardware screen notches cleanly while staying edge-to-edge */
+      padding: env(safe-area-inset-top, 12px) env(safe-area-inset-right, 12px) env(safe-area-inset-bottom, 12px) env(safe-area-inset-left, 12px); 
+      width: 100%; 
+      height: 100%; 
+      box-sizing: border-box; 
+      background: #111; 
+      color: white; 
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+      overflow: hidden; 
+    }
     
-    .container { display: flex; flex-direction: column; gap: 12px; width: 100%; height: calc(100% - 110px); }
+    /* FIX: Recalculated structural containers using dynamic viewport sizes to maximize layout real estate */
+    .container { display: flex; flex-direction: column; gap: 12px; width: 100%; height: calc(100vh - 120px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
     
     @media (orientation: landscape) {
       .container { flex-direction: row; }
@@ -27,21 +42,18 @@
     
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; }
     
-    /* Zoom Slider overlay configuration */
     .zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); opacity: 1; transition: opacity 0.3s ease; }
     .zoom-container.fade-out { opacity: 0; pointer-events: none; }
     .zoom-container label { font-size: 10px; font-weight: bold; font-family: monospace; min-width: 24px; text-align: center; color: #007aff; }
     .zoom-slider { -webkit-appearance: none; appearance: none; width: 100px; height: 4px; background: #444; border-radius: 2px; outline: none; }
     .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #007aff; cursor: pointer; }
 
-    /* Custom Master Timeline Control Bar Layout */
     .timeline-footer { width: 100%; height: 40px; display: none; align-items: center; gap: 12px; background: rgba(0,0,0,0.4); padding: 0 16px; box-sizing: border-box; border-radius: 8px; margin-top: 8px; }
     .timeline-footer.show { display: flex; }
     .timeline-slider { flex-grow: 1; -webkit-appearance: none; appearance: none; height: 6px; background: #333; border-radius: 3px; outline: none; }
     .timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #007aff; cursor: pointer; border: 2px solid white; }
     .time-display { font-family: monospace; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
 
-    /* Control Footer Setup */
     .controls-footer { height: 50px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 6px; position: relative; }
     button { background: #007aff; color: white; border: none; padding: 10px 20px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
     button:active { background: #0056b3; }
@@ -69,7 +81,6 @@
   <div class="container">
     <div class="box">
       <div class="label">REFERENCE LESSON</div>
-      <!-- Reference video has no native controls anymore to guarantee system sync via our unified timeline slider -->
       <video id="refVideo" src="https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4" playsinline webkit-playsinline></video>
       <div class="countdown-overlay" id="countdown">3</div>
     </div>
@@ -79,7 +90,6 @@
       <div class="rec-indicator" id="recBadge">● RECORDING</div>
       
       <div class="viewfinder-container">
-        <!-- Zoom stays rock solid here using high-performance CSS transforms -->
         <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
       </div>
       
@@ -90,7 +100,6 @@
     </div>
   </div>
 
-  <!-- FIX: Master tracking timeline bar that links both playheads safely outside the video layers -->
   <div class="timeline-footer" id="masterTimeline">
     <input type="range" id="scrubSlider" class="timeline-slider" min="0" max="100" step="0.1" value="0">
     <div class="time-display" id="timeLabel">0:00</div>
@@ -99,7 +108,7 @@
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
-    <div class="version-tag">Version 15</div>
+    <div class="version-tag">Version 16</div>
   </div>
 
   <script>
@@ -146,10 +155,8 @@
 
     function resetZoomFadeTimer() {
       if (isReviewMode) return; 
-      
       zoomUi.classList.remove('fade-out');
       clearTimeout(zoomFadeTimeout);
-      
       zoomFadeTimeout = setTimeout(() => {
         if (!isReviewMode) {
           zoomUi.classList.add('fade-out');
@@ -202,13 +209,11 @@
       refVideo.currentTime = 0;
       viewfinder.currentTime = 0;
       scrubSlider.value = 0;
-      
       setTimeout(() => {
         if (isReviewMode) playBoth();
       }, 200);
     }
 
-    // Capture explicit video body taps to prevent sync separation
     cameraBox.addEventListener('click', (e) => {
       if (!isReviewMode || e.target.closest('#zoomUi')) return;
       actionBtn.click();
@@ -304,7 +309,6 @@
         viewfinder.setAttribute('playsinline', 'true');
         viewfinder.setAttribute('webkit-playsinline', 'true');
         
-        // Retain visual zoom factor safely using high-perf transform scaling matrix
         viewfinder.style.transform = `scale(${chosenScale})`;
         zoomUi.style.display = "none";
 
@@ -317,7 +321,6 @@
         refVideo.currentTime = 0;
         viewfinder.currentTime = 0;
 
-        // Reveal the system Master Scrub Timeline
         masterTimeline.classList.add('show');
         scrubSlider.value = 0;
 
@@ -362,7 +365,6 @@
       }
     }
 
-    // FIX: Core event handlers linking the master timeline directly to both tracks perfectly
     function setupMasterTimelineSync() {
       scrubSlider.addEventListener('input', () => {
         isUserScrubbing = true;
@@ -387,20 +389,15 @@
 
     function startLoopEngine() {
       clearInterval(loopInterval);
-      
       loopInterval = setInterval(() => {
         if (!isReviewMode) return;
-
-        // Update the custom slider track value as the video rolls forward naturally
         if (!refVideo.paused && !isUserScrubbing) {
           const currentPct = (refVideo.currentTime / refVideo.duration) * 100;
           scrubSlider.value = currentPct;
           updateTimeDisplay(refVideo.currentTime);
         }
-
         const refEnded = refVideo.currentTime >= refVideo.duration - 0.15 || refVideo.ended;
         const viewEnded = (viewfinder.duration && viewfinder.currentTime >= viewfinder.duration - 0.15) || viewfinder.ended;
-
         if ((refEnded || viewEnded) && !isUserScrubbing) {
           triggerSynchronizedLoop();
         }
