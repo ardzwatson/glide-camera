@@ -128,6 +128,9 @@
       isReviewMode = false;
       recordedChunks = [];
       
+      // Clean up event listeners to prevent legacy loops
+      refVideo.onended = null;
+      
       refVideo.pause();
       refVideo.currentTime = 0;
       refVideo.controls = false;
@@ -178,7 +181,6 @@
       refVideo.currentTime = 0;
       isRecordingMode = true;
       
-      // Preferred Android container is webm, preferred iOS container is mp4
       let options = { mimeType: 'video/webm;codecs=vp8,opus' };
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
         options = { mimeType: 'video/mp4' };
@@ -226,10 +228,9 @@
         refVideo.currentTime = 0;
         viewfinder.currentTime = 0;
         
-        setupTimelineLocking();
+        setupReviewLoopAndSync();
       };
 
-      // FIXED: Removed time-slicing to protect native Android file integrity
       mediaRecorder.start(); 
       refVideo.play();
       
@@ -241,6 +242,7 @@
       resetBtn.innerText = "Cancel Run";
       resetBtn.disabled = false;
 
+      // Handle natural completion during recording phase
       refVideo.onended = () => {
         if (mediaRecorder && mediaRecorder.state !== "inactive") {
           mediaRecorder.stop();
@@ -255,8 +257,27 @@
       }
     }
 
-    function setupTimelineLocking() {
-      // FIXED: Only sync timelines when manual scrubbing/seeking happens to completely prevent the playback loop glitch
+    function setupReviewLoopAndSync() {
+      // FIXED: Hard hardware reset loop for perfect, lag-free rewatches
+      refVideo.onended = () => {
+        if (!isReviewMode) return;
+        
+        // Pause both immediately to sever lag drift
+        refVideo.pause();
+        viewfinder.pause();
+        
+        // Hard-reset timelines back to starting frame
+        refVideo.currentTime = 0;
+        viewfinder.currentTime = 0;
+        
+        // Restart cleanly together
+        setTimeout(() => {
+          viewfinder.play();
+          refVideo.play();
+        }, 50);
+      };
+
+      // Only sync timelines when manual scrubbing/seeking happens to prevent stutters
       refVideo.addEventListener('seeking', () => {
         if (isSyncing) return;
         isSyncing = true;
@@ -271,7 +292,7 @@
         isSyncing = false;
       });
 
-      // Simple sync drift catch layout when paused or played
+      // Synchronized play state layout matching
       refVideo.addEventListener('play', () => { viewfinder.play(); actionBtn.innerText = "Pause Review"; });
       refVideo.addEventListener('pause', () => { viewfinder.pause(); actionBtn.innerText = "Play Review"; });
       viewfinder.addEventListener('play', () => { refVideo.play(); actionBtn.innerText = "Pause Review"; });
