@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Sync Performance Review (V14)</title>
+  <title>Sync Performance Review (V15)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -12,7 +12,7 @@
   <style>
     body, html { margin: 0; padding: 12px; width: 100%; height: 100%; box-sizing: border-box; background: #111; color: white; font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; }
     
-    .container { display: flex; flex-direction: column; gap: 12px; width: 100%; height: calc(100% - 70px); }
+    .container { display: flex; flex-direction: column; gap: 12px; width: 100%; height: calc(100% - 110px); }
     
     @media (orientation: landscape) {
       .container { flex-direction: row; }
@@ -21,35 +21,33 @@
 
     .box { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
     
-    /* The outer viewfinder wrapper frame stays perfectly stable */
     .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; }
     
-    /* FIX: When in review mode, we shrink the video's layout boundary slightly to leave room for controls */
-    .viewfinder-container.review-layout video {
-      height: calc(100% - 44px) !important; /* Forces the bottom control area to sit inside the visible box */
-      top: 0;
-      position: absolute;
-    }
-    
-    /* Default layout configuration */
-    video { width: 100%; height: 100%; object-fit: cover; background: #000; transition: transform 0.1s ease-out; transform-origin: center top; }
+    video { width: 100%; height: 100%; object-fit: cover; background: #000; transition: transform 0.1s ease-out; transform-origin: center center; }
     
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; }
     
-    /* Zoom Slider Overlays */
+    /* Zoom Slider overlay configuration */
     .zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); opacity: 1; transition: opacity 0.3s ease; }
     .zoom-container.fade-out { opacity: 0; pointer-events: none; }
     .zoom-container label { font-size: 10px; font-weight: bold; font-family: monospace; min-width: 24px; text-align: center; color: #007aff; }
     .zoom-slider { -webkit-appearance: none; appearance: none; width: 100px; height: 4px; background: #444; border-radius: 2px; outline: none; }
     .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #007aff; cursor: pointer; }
 
-    /* Core Action Interface Setup */
-    .controls-footer { height: 60px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 10px; position: relative; }
-    button { background: #007aff; color: white; border: none; padding: 12px 24px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s, opacity 0.2s; }
+    /* Custom Master Timeline Control Bar Layout */
+    .timeline-footer { width: 100%; height: 40px; display: none; align-items: center; gap: 12px; background: rgba(0,0,0,0.4); padding: 0 16px; box-sizing: border-box; border-radius: 8px; margin-top: 8px; }
+    .timeline-footer.show { display: flex; }
+    .timeline-slider { flex-grow: 1; -webkit-appearance: none; appearance: none; height: 6px; background: #333; border-radius: 3px; outline: none; }
+    .timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #007aff; cursor: pointer; border: 2px solid white; }
+    .time-display { font-family: monospace; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
+
+    /* Control Footer Setup */
+    .controls-footer { height: 50px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 6px; position: relative; }
+    button { background: #007aff; color: white; border: none; padding: 10px 20px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
     button:active { background: #0056b3; }
     button:disabled { background: #444; color: #888; cursor: not-allowed; }
     
-    .version-tag { color: #666; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: monospace; }
+    .version-tag { color: #556; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: monospace; position: absolute; right: 8px; }
     
     .btn-recording { background: #ff453a !important; }
     .btn-recording:active { background: #ff3b30 !important; }
@@ -71,6 +69,7 @@
   <div class="container">
     <div class="box">
       <div class="label">REFERENCE LESSON</div>
+      <!-- Reference video has no native controls anymore to guarantee system sync via our unified timeline slider -->
       <video id="refVideo" src="https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4" playsinline webkit-playsinline></video>
       <div class="countdown-overlay" id="countdown">3</div>
     </div>
@@ -79,8 +78,8 @@
       <div class="label" id="streamLabel">YOU (LIVE CAM)</div>
       <div class="rec-indicator" id="recBadge">● RECORDING</div>
       
-      <div class="viewfinder-container" id="vfContainer">
-        <!-- FIX: We keep transform scaling on the video track element, but pin origin to center top so the timeline can safely rest under the frame layout bounds -->
+      <div class="viewfinder-container">
+        <!-- Zoom stays rock solid here using high-performance CSS transforms -->
         <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
       </div>
       
@@ -91,16 +90,21 @@
     </div>
   </div>
 
+  <!-- FIX: Master tracking timeline bar that links both playheads safely outside the video layers -->
+  <div class="timeline-footer" id="masterTimeline">
+    <input type="range" id="scrubSlider" class="timeline-slider" min="0" max="100" step="0.1" value="0">
+    <div class="time-display" id="timeLabel">0:00</div>
+  </div>
+
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
-    <div class="version-tag">Version 14</div>
+    <div class="version-tag">Version 15</div>
   </div>
 
   <script>
     const refVideo = document.getElementById('refVideo');
     const viewfinder = document.getElementById('viewfinder');
-    const vfContainer = document.getElementById('vfContainer');
     const actionBtn = document.getElementById('actionBtn');
     const resetBtn = document.getElementById('resetBtn');
     const countdown = document.getElementById('countdown');
@@ -111,6 +115,10 @@
     const zoomSlider = document.getElementById('zoomSlider');
     const zoomLabel = document.getElementById('zoomLabel');
     const zoomUi = document.getElementById('zoomUi');
+    
+    const masterTimeline = document.getElementById('masterTimeline');
+    const scrubSlider = document.getElementById('scrubSlider');
+    const timeLabel = document.getElementById('timeLabel');
 
     let mediaRecorder = null;
     let recordedChunks = [];
@@ -118,7 +126,7 @@
     let isRecordingMode = false;
     let isReviewMode = false;
     let loopInterval = null;
-    let activeScrubSource = null; 
+    let isUserScrubbing = false;
     let zoomFadeTimeout = null;
     let chosenScale = 1;
 
@@ -193,11 +201,18 @@
       shadowPause();
       refVideo.currentTime = 0;
       viewfinder.currentTime = 0;
+      scrubSlider.value = 0;
       
       setTimeout(() => {
         if (isReviewMode) playBoth();
       }, 200);
     }
+
+    // Capture explicit video body taps to prevent sync separation
+    cameraBox.addEventListener('click', (e) => {
+      if (!isReviewMode || e.target.closest('#zoomUi')) return;
+      actionBtn.click();
+    });
 
     resetBtn.addEventListener('click', () => {
       clearInterval(loopInterval);
@@ -205,21 +220,10 @@
       isRecordingMode = false;
       isReviewMode = false;
       recordedChunks = [];
-      activeScrubSource = null;
       chosenScale = 1;
-      
-      refVideo.onseeking = null;
-      refVideo.onseeked = null;
-      refVideo.onended = null;
-      viewfinder.onseeking = null;
-      viewfinder.onseeked = null;
-      viewfinder.onended = null;
-      viewfinder.onplay = null;
-      viewfinder.onpause = null;
       
       refVideo.pause();
       refVideo.currentTime = 0;
-      refVideo.controls = false;
 
       if (mediaRecorder && mediaRecorder.state !== "inactive") {
         mediaRecorder.stop();
@@ -229,10 +233,8 @@
       viewfinder.src = "";
       viewfinder.srcObject = liveStream;
       viewfinder.muted = true;
-      viewfinder.controls = false;
       
-      // Clear specific layout flags
-      vfContainer.classList.remove('review-layout');
+      masterTimeline.classList.remove('show');
       
       zoomSlider.value = 1;
       zoomLabel.innerText = "1.0x";
@@ -302,13 +304,9 @@
         viewfinder.setAttribute('playsinline', 'true');
         viewfinder.setAttribute('webkit-playsinline', 'true');
         
-        // FIX: Inject custom structural class layout to leave safe area bounds for controls below the track
-        vfContainer.classList.add('review-layout');
+        // Retain visual zoom factor safely using high-perf transform scaling matrix
         viewfinder.style.transform = `scale(${chosenScale})`;
         zoomUi.style.display = "none";
-
-        viewfinder.controls = true; 
-        refVideo.controls = true; 
 
         streamLabel.innerText = "YOU (RECORDED REVIEW)";
         isReviewMode = true;
@@ -319,6 +317,10 @@
         refVideo.currentTime = 0;
         viewfinder.currentTime = 0;
 
+        // Reveal the system Master Scrub Timeline
+        masterTimeline.classList.add('show');
+        scrubSlider.value = 0;
+
         actionBtn.innerText = "Play Review";
         actionBtn.className = ""; 
         actionBtn.disabled = false;
@@ -327,7 +329,7 @@
         resetBtn.className = "danger-active"; 
         resetBtn.disabled = false;
         
-        setupManualScrubSync();
+        setupMasterTimelineSync();
         startLoopEngine();
       };
 
@@ -360,75 +362,49 @@
       }
     }
 
-    function setupManualScrubSync() {
-      viewfinder.onplay = () => {
-        if (isReviewMode && refVideo.paused) {
-          refVideo.play();
-          actionBtn.innerText = "Pause Review";
-        }
-      };
-      viewfinder.onpause = () => {
-        if (isReviewMode && !refVideo.paused) {
-          refVideo.pause();
-          actionBtn.innerText = "Play Review";
-        }
-      };
-      
-      refVideo.onplay = () => {
-        if (isReviewMode && viewfinder.paused) {
-          viewfinder.play();
-          actionBtn.innerText = "Pause Review";
-        }
-      };
-      refVideo.onpause = () => {
-        if (isReviewMode && !viewfinder.paused) {
-          viewfinder.pause();
-          actionBtn.innerText = "Play Review";
-        }
-      };
+    // FIX: Core event handlers linking the master timeline directly to both tracks perfectly
+    function setupMasterTimelineSync() {
+      scrubSlider.addEventListener('input', () => {
+        isUserScrubbing = true;
+        const targetPct = parseFloat(scrubSlider.value);
+        const targetTime = (targetPct / 100) * refVideo.duration;
+        
+        refVideo.currentTime = targetTime;
+        viewfinder.currentTime = targetTime;
+        updateTimeDisplay(targetTime);
+      });
 
-      refVideo.onseeking = () => {
-        if (!isReviewMode) return;
-        if (activeScrubSource === null) activeScrubSource = 'reference';
-        if (activeScrubSource === 'reference') viewfinder.currentTime = refVideo.currentTime;
-      };
+      scrubSlider.addEventListener('change', () => {
+        isUserScrubbing = false;
+      });
+    }
 
-      viewfinder.onseeking = () => {
-        if (!isReviewMode) return;
-        if (activeScrubSource === null) activeScrubSource = 'recorded';
-        if (activeScrubSource === 'recorded') refVideo.currentTime = viewfinder.currentTime;
-      };
-
-      refVideo.onseeked = () => {
-        if (activeScrubSource === 'recorded') activeScrubSource = null;
-      };
-
-      viewfinder.onseeked = () => {
-        if (activeScrubSource === 'reference') activeScrubSource = null;
-      };
-
-      refVideo.onended = () => {
-        if (isReviewMode) triggerSynchronizedLoop();
-      };
-      
-      viewfinder.onended = () => {
-        if (isReviewMode) triggerSynchronizedLoop();
-      };
+    function updateTimeDisplay(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      timeLabel.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
 
     function startLoopEngine() {
       clearInterval(loopInterval);
       
       loopInterval = setInterval(() => {
-        if (!isReviewMode || refVideo.paused || activeScrubSource !== null) return;
+        if (!isReviewMode) return;
+
+        // Update the custom slider track value as the video rolls forward naturally
+        if (!refVideo.paused && !isUserScrubbing) {
+          const currentPct = (refVideo.currentTime / refVideo.duration) * 100;
+          scrubSlider.value = currentPct;
+          updateTimeDisplay(refVideo.currentTime);
+        }
 
         const refEnded = refVideo.currentTime >= refVideo.duration - 0.15 || refVideo.ended;
         const viewEnded = (viewfinder.duration && viewfinder.currentTime >= viewfinder.duration - 0.15) || viewfinder.ended;
 
-        if (refEnded || viewEnded) {
+        if ((refEnded || viewEnded) && !isUserScrubbing) {
           triggerSynchronizedLoop();
         }
-      }, 100);
+      }, 50);
     }
 
     window.addEventListener('DOMContentLoaded', initCamera);
