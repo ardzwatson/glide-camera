@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V20)</title>
+  <title>Sync Performance Review (V21)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -94,8 +94,9 @@
     
     video { width: 100%; height: 100%; object-fit: cover; background: #000; transition: transform 0.1s ease-out; transform-origin: center center; }
     
-    .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; }
-    
+    .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 2px; }
+    .zoom-note { font-size: 8px; color: #aaa; font-weight: normal; }
+
     .zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); opacity: 1; transition: opacity 0.3s ease; }
     .zoom-container.fade-out { opacity: 0; pointer-events: none; }
     .zoom-container label { font-size: 10px; font-weight: bold; font-family: monospace; min-width: 24px; text-align: center; color: #007aff; }
@@ -123,7 +124,7 @@
     #resetBtn.danger-active { background: #ff3b30; }
     #resetBtn.danger-active:active { background: #b3241f; }
 
-    /* UI ADDITION: Download styling */
+    /* UI RE-ORDER & RE-LABEL: Modified green action layout */
     #downloadBtn { background: #34c759; display: none; }
     #downloadBtn:active { background: #248a3d; }
 
@@ -144,7 +145,10 @@
     </div>
 
     <div class="box" id="cameraBox">
-      <div class="label" id="streamLabel">YOU (LIVE CAM)</div>
+      <div class="label" id="streamLabel">
+        <span>YOU (LIVE CAM)</span>
+        <span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>
+      </div>
       <div class="rec-indicator" id="recBadge">● RECORDING</div>
       
       <div class="viewfinder-container">
@@ -163,11 +167,12 @@
     <div class="time-display" id="timeLabel">0:00</div>
   </div>
 
+  <!-- Re-ordered element nodes strictly layout based -->
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
-    <button id="downloadBtn">Download Video</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
-    <div class="version-tag">V20</div>
+    <button id="downloadBtn">Save</button>
+    <div class="version-tag">V21</div>
   </div>
 
   <script>
@@ -180,6 +185,7 @@
     const recBadge = document.getElementById('recBadge');
     const streamLabel = document.getElementById('streamLabel');
     const cameraBox = document.getElementById('cameraBox');
+    const zoomNote = document.getElementById('zoomNote');
     
     const zoomSlider = document.getElementById('zoomSlider');
     const zoomLabel = document.getElementById('zoomLabel');
@@ -280,14 +286,36 @@
       actionBtn.click();
     });
 
-    /* FUNCTIONALITY ADDITION: Local file export tracking */
+    /* FUNCTIONALITY MODIFICATION: Custom Name Input Dialog Prompt */
     downloadBtn.addEventListener('click', () => {
       if (!currentVideoBlob) return;
+      
+      // Pause playback so looping background doesn't distract user while typing
+      if (isReviewMode && !refVideo.paused) {
+        pauseBoth();
+      }
+
+      let customName = prompt("Enter a file name for your video:", `performance-review-${Date.now()}`);
+      
+      // If user clicks cancel, exit gracefully without performing action
+      if (customName === null) return;
+      
+      // Clean name value whitespace or fallback if blank string submitted
+      customName = customName.trim();
+      if (!customName) {
+        customName = `performance-review-${Date.now()}`;
+      }
+
+      // Ensure clean parsing handling file extensions
+      if (!customName.toLowerCase().endsWith('.mp4')) {
+        customName += '.mp4';
+      }
+
       const url = URL.createObjectURL(currentVideoBlob);
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      a.download = `performance-review-${Date.now()}.mp4`;
+      a.download = customName;
       document.body.appendChild(a);
       a.click();
       setTimeout(() => {
@@ -327,7 +355,7 @@
       resetZoomFadeTimer();
       
       recBadge.style.display = "none";
-      streamLabel.innerText = "YOU (LIVE CAM)";
+      streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
       
       actionBtn.innerText = "Start Session";
       actionBtn.className = ""; 
@@ -393,7 +421,7 @@
         viewfinder.style.transform = `scale(${chosenScale})`;
         zoomUi.style.display = "none";
 
-        streamLabel.innerText = "YOU (RECORDED REVIEW)";
+        document.getElementById('streamLabel').innerHTML = `<span>YOU (RECORDED REVIEW)</span><span class="zoom-note" id="zoomNote">Saved video captures standard widescreen frame</span>`;
         isReviewMode = true;
         
         refVideo.pause();
