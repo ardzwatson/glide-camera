@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Sync Performance Review (V13)</title>
+  <title>Sync Performance Review (V14)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -21,22 +21,29 @@
 
     .box { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
     
-    /* The container stays fixed and clips the oversized zoomed video frame safely */
-    .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    /* The outer viewfinder wrapper frame stays perfectly stable */
+    .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; }
     
-    /* Default layout state */
-    video { width: 100%; height: 100%; object-fit: cover; background: #000; }
+    /* FIX: When in review mode, we shrink the video's layout boundary slightly to leave room for controls */
+    .viewfinder-container.review-layout video {
+      height: calc(100% - 44px) !important; /* Forces the bottom control area to sit inside the visible box */
+      top: 0;
+      position: absolute;
+    }
+    
+    /* Default layout configuration */
+    video { width: 100%; height: 100%; object-fit: cover; background: #000; transition: transform 0.1s ease-out; transform-origin: center top; }
     
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; }
     
-    /* Zoom UI Slider Overlay */
+    /* Zoom Slider Overlays */
     .zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); opacity: 1; transition: opacity 0.3s ease; }
     .zoom-container.fade-out { opacity: 0; pointer-events: none; }
     .zoom-container label { font-size: 10px; font-weight: bold; font-family: monospace; min-width: 24px; text-align: center; color: #007aff; }
     .zoom-slider { -webkit-appearance: none; appearance: none; width: 100px; height: 4px; background: #444; border-radius: 2px; outline: none; }
     .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #007aff; cursor: pointer; }
 
-    /* Controls Footer Layout Setup */
+    /* Core Action Interface Setup */
     .controls-footer { height: 60px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 10px; position: relative; }
     button { background: #007aff; color: white; border: none; padding: 12px 24px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s, opacity 0.2s; }
     button:active { background: #0056b3; }
@@ -72,8 +79,8 @@
       <div class="label" id="streamLabel">YOU (LIVE CAM)</div>
       <div class="rec-indicator" id="recBadge">● RECORDING</div>
       
-      <div class="viewfinder-container">
-        <!-- FIX: We zoom into the video track using clean pixel dimension scale instead of a CSS transform wrapper -->
+      <div class="viewfinder-container" id="vfContainer">
+        <!-- FIX: We keep transform scaling on the video track element, but pin origin to center top so the timeline can safely rest under the frame layout bounds -->
         <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
       </div>
       
@@ -87,12 +94,13 @@
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
-    <div class="version-tag">Version 13</div>
+    <div class="version-tag">Version 14</div>
   </div>
 
   <script>
     const refVideo = document.getElementById('refVideo');
     const viewfinder = document.getElementById('viewfinder');
+    const vfContainer = document.getElementById('vfContainer');
     const actionBtn = document.getElementById('actionBtn');
     const resetBtn = document.getElementById('resetBtn');
     const countdown = document.getElementById('countdown');
@@ -144,17 +152,10 @@
     cameraBox.addEventListener('mousemove', resetZoomFadeTimer);
     cameraBox.addEventListener('touchstart', resetZoomFadeTimer);
 
-    // FIX: Apply sizing percentages natively instead of CSS transforms so the layout system exposes standard controls
-    function applyDimensionZoom(scale) {
-      const percentage = scale * 100;
-      viewfinder.style.width = `${percentage}%`;
-      viewfinder.style.height = `${percentage}%`;
-    }
-
     zoomSlider.addEventListener('input', (e) => {
       chosenScale = parseFloat(e.target.value);
       zoomLabel.innerText = `${chosenScale.toFixed(1)}x`;
-      applyDimensionZoom(chosenScale);
+      viewfinder.style.transform = `scale(${chosenScale})`;
       resetZoomFadeTimer();
     });
 
@@ -230,11 +231,12 @@
       viewfinder.muted = true;
       viewfinder.controls = false;
       
-      // Clean system reset to initial values
+      // Clear specific layout flags
+      vfContainer.classList.remove('review-layout');
+      
       zoomSlider.value = 1;
       zoomLabel.innerText = "1.0x";
-      viewfinder.style.width = "100%";
-      viewfinder.style.height = "100%";
+      viewfinder.style.transform = "scale(1)";
       zoomUi.style.display = "flex";
       resetZoomFadeTimer();
       
@@ -300,8 +302,9 @@
         viewfinder.setAttribute('playsinline', 'true');
         viewfinder.setAttribute('webkit-playsinline', 'true');
         
-        // FIX: Keep user zoom intact natively by applying sizing variables directly
-        applyDimensionZoom(chosenScale);
+        // FIX: Inject custom structural class layout to leave safe area bounds for controls below the track
+        vfContainer.classList.add('review-layout');
+        viewfinder.style.transform = `scale(${chosenScale})`;
         zoomUi.style.display = "none";
 
         viewfinder.controls = true; 
@@ -358,7 +361,6 @@
     }
 
     function setupManualScrubSync() {
-      // FIX: Capture native play/pause touches on the videos to prevent sync drift
       viewfinder.onplay = () => {
         if (isReviewMode && refVideo.paused) {
           refVideo.play();
