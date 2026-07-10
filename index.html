@@ -73,7 +73,7 @@
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
-    <div class="version-tag">Version 4</div>
+    <div class="version-tag">Version 5</div>
   </div>
 
   <script>
@@ -143,6 +143,7 @@
       refVideo.pause();
       refVideo.currentTime = 0;
       refVideo.controls = false;
+      refVideo.onended = null;
 
       if (mediaRecorder && mediaRecorder.state !== "inactive") {
         mediaRecorder.stop();
@@ -190,7 +191,6 @@
       refVideo.currentTime = 0;
       isRecordingMode = true;
       
-      // Let system auto-select best local optimized hardware codec
       try {
         mediaRecorder = new MediaRecorder(liveStream);
       } catch (e) {
@@ -236,8 +236,13 @@
         startLoopEngine();
       };
 
+      // FIXED: Start camera engine first, then cushion by 250ms to allow hardware spin-up before firing the reference video
       mediaRecorder.start(); 
-      refVideo.play();
+      setTimeout(() => {
+        if (isRecordingMode) {
+          refVideo.play();
+        }
+      }, 250);
       
       recBadge.style.display = "block";
       actionBtn.innerText = "Stop & Review";
@@ -247,7 +252,6 @@
       resetBtn.innerText = "Cancel Run";
       resetBtn.disabled = false;
 
-      // Safe stop when track ends naturally
       refVideo.onended = () => {
         if (mediaRecorder && mediaRecorder.state !== "inactive") {
           mediaRecorder.stop();
@@ -262,26 +266,28 @@
       }
     }
 
-    // FIXED: Independent, highly performant polling engine to force loop without drifting
+    // FIXED: Multi-track tracking loops immediately if EITHER video finishes to avoid drift stutters
     function startLoopEngine() {
       clearInterval(loopInterval);
       
       loopInterval = setInterval(() => {
         if (!isReviewMode || refVideo.paused) return;
 
-        // Check if reference video finished or is about to end
-        if (refVideo.currentTime >= refVideo.duration - 0.1 || refVideo.ended) {
+        const refEnded = refVideo.currentTime >= refVideo.duration - 0.15 || refVideo.ended;
+        const viewEnded = viewfinder.currentTime >= viewfinder.duration - 0.15 || viewfinder.ended;
+
+        // If either stream completes, restart the cycle together cleanly
+        if (refEnded || viewEnded) {
           pauseBoth();
           
-          // FastCache hard reset to clean browser memory stream buffer
           refVideo.currentTime = 0;
           viewfinder.currentTime = 0;
           
           setTimeout(() => {
             playBoth();
-          }, 150); 
+          }, 200); 
         }
-      }, 100); // Poll every 100ms for robust frame timing layout tracking
+      }, 100);
     }
 
     window.addEventListener('DOMContentLoaded', initCamera);
