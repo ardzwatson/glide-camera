@@ -73,7 +73,7 @@
   <div class="controls-footer">
     <button id="actionBtn">Start Session</button>
     <button id="resetBtn" disabled>Reset / Clear</button>
-    <div class="version-tag">Version 5</div>
+    <div class="version-tag">Version 6</div>
   </div>
 
   <script>
@@ -90,6 +90,7 @@
     let liveStream = null;
     let isRecordingMode = false;
     let isReviewMode = false;
+    let isSyncing = false;
     let loopInterval = null;
 
     // Initialize Camera Access Frame
@@ -140,10 +141,13 @@
       isReviewMode = false;
       recordedChunks = [];
       
+      // Clean up event listeners to prevent residual ghosting loops
+      refVideo.onseeking = null;
+      viewfinder.onseeking = null;
+      
       refVideo.pause();
       refVideo.currentTime = 0;
       refVideo.controls = false;
-      refVideo.onended = null;
 
       if (mediaRecorder && mediaRecorder.state !== "inactive") {
         mediaRecorder.stop();
@@ -222,6 +226,13 @@
         streamLabel.innerText = "YOU (RECORDED REVIEW)";
         isReviewMode = true;
         
+        // FIXED: Stop any lingering play state right away to force synchronized playback start
+        refVideo.pause();
+        viewfinder.pause();
+        
+        refVideo.currentTime = 0;
+        viewfinder.currentTime = 0;
+
         actionBtn.innerText = "Play Review";
         actionBtn.className = ""; 
         actionBtn.disabled = false;
@@ -230,13 +241,10 @@
         resetBtn.className = "danger-active"; 
         resetBtn.disabled = false;
         
-        refVideo.currentTime = 0;
-        viewfinder.currentTime = 0;
-        
+        setupManualScrubSync();
         startLoopEngine();
       };
 
-      // FIXED: Start camera engine first, then cushion by 250ms to allow hardware spin-up before firing the reference video
       mediaRecorder.start(); 
       setTimeout(() => {
         if (isRecordingMode) {
@@ -266,7 +274,23 @@
       }
     }
 
-    // FIXED: Multi-track tracking loops immediately if EITHER video finishes to avoid drift stutters
+    // FIXED: Snaps timelines together instantly when dragging/scrubbing a video timeline
+    function setupManualScrubSync() {
+      refVideo.onseeking = () => {
+        if (isSyncing || !isReviewMode) return;
+        isSyncing = true;
+        viewfinder.currentTime = refVideo.currentTime;
+        isSyncing = false;
+      };
+
+      viewfinder.onseeking = () => {
+        if (isSyncing || !isReviewMode) return;
+        isSyncing = true;
+        refVideo.currentTime = viewfinder.currentTime;
+        isSyncing = false;
+      };
+    }
+
     function startLoopEngine() {
       clearInterval(loopInterval);
       
@@ -276,7 +300,6 @@
         const refEnded = refVideo.currentTime >= refVideo.duration - 0.15 || refVideo.ended;
         const viewEnded = viewfinder.currentTime >= viewfinder.duration - 0.15 || viewfinder.ended;
 
-        // If either stream completes, restart the cycle together cleanly
         if (refEnded || viewEnded) {
           pauseBoth();
           
