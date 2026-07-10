@@ -3,30 +3,225 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Landscape Split View</title>
+  <title>Sync Performance Review</title>
   
-  <!-- Add these 3 tags to remove the top URL bar when added to home screen -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <style>
-    /* Keep your existing CSS styling blocks exactly the same here */
     body, html { margin: 0; padding: 12px; width: 100%; height: 100%; box-sizing: border-box; background: #111; color: white; font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; }
-    .container { display: flex; flex-direction: column-reverse; gap: 12px; width: 100%; height: 100%; }
+    
+    .container { display: flex; flex-direction: column; gap: 12px; width: 100%; height: calc(100% - 70px); }
+    
     @media (orientation: landscape) {
       .container { flex-direction: row; }
       .box { height: 100% !important; width: 50% !important; aspect-ratio: auto !important; }
-      .box-youtube { order: 1; }
-      .box-camera { order: 2; }
     }
+
     .box { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
-    iframe, video { width: 100%; height: 100%; border: none; object-fit: cover; }
+    video { width: 100%; height: 100%; object-fit: cover; background: #000; }
+    
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; }
-    .zoom-controls { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); padding: 8px 16px; border-radius: 20px; display: flex; align-items: center; gap: 10px; z-index: 20; backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: opacity 0.4s ease, transform 0.3s ease; }
-    .zoom-controls.visible { opacity: 1; pointer-events: auto; }
-    .zoom-controls input { width: 110px; accent-color: #007aff; cursor: pointer; }
-    .zoom-controls span { font-size: 11px; font-weight: bold; min-width: 32px; text-align: center; }
+    
+    /* Control Footer Setup */
+    .controls-footer { height: 60px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 10px; }
+    button { background: #007aff; color: white; border: none; padding: 12px 24px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s, opacity 0.2s; }
+    button:active { background: #0056b3; }
+    button:disabled { background: #444; color: #888; cursor: not-allowed; }
+    #resetBtn { background: #ff3b30; }
+    #resetBtn:active { background: #b3241f; }
+
+    /* Overlay Countdown Text */
+    .countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: #fff; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .countdown-overlay.show { opacity: 1; }
+    
+    /* Live Status Indicators */
+    .rec-indicator { position: absolute; top: 12px; right: 12px; background: #ff3b30; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; animation: pulse 1s infinite alternate; display: none; z-index: 10; }
+    @keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
   </style>
 </head>
-<!-- Keep your exact body and javascript blocks completely untouched down here -->
+<body>
+
+  <div class="container">
+    <!-- Reference Video Window -->
+    <div class="box">
+      <div class="label">REFERENCE LESSON</div>
+      <!-- Configured directly to your provided Cloudinary performance template asset -->
+      <video id="refVideo" src="https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4" playsinline></video>
+      <div class="countdown-overlay" id="countdown">3</div>
+    </div>
+
+    <!-- User Stream Interaction Window -->
+    <div class="box" id="cameraBox">
+      <div class="label" id="streamLabel">YOU (LIVE CAM)</div>
+      <div class="rec-indicator" id="recBadge">● RECORDING</div>
+      <video id="viewfinder" autoplay playsinline muted></video>
+    </div>
+  </div>
+
+  <!-- Action Dashboard Layout Footer -->
+  <div class="controls-footer">
+    <button id="actionBtn">Start Session</button>
+    <button id="resetBtn" disabled>Reset / Clear</button>
+  </div>
+
+  <script>
+    const refVideo = document.getElementById('refVideo');
+    const viewfinder = document.getElementById('viewfinder');
+    const actionBtn = document.getElementById('actionBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const countdown = document.getElementById('countdown');
+    const recBadge = document.getElementById('recBadge');
+    const streamLabel = document.getElementById('streamLabel');
+
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let liveStream = null;
+    let isReviewMode = false;
+    let isSyncing = false;
+
+    // Initialize Camera Access Frame
+    async function initCamera() {
+      try {
+        liveStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: true 
+        });
+        viewfinder.srcObject = liveStream;
+      } catch (err) {
+        alert("Camera and Microphone access required to sync performance.");
+        console.error(err);
+      }
+    }
+
+    // Action Coordinator Button Loop
+    actionBtn.addEventListener('click', () => {
+      if (!isReviewMode) {
+        runCountdown();
+      } else {
+        if (refVideo.paused) {
+          refVideo.play();
+          viewfinder.play();
+          actionBtn.innerText = "Pause Review";
+        } else {
+          refVideo.pause();
+          viewfinder.pause();
+          actionBtn.innerText = "Play Review";
+        }
+      }
+    });
+
+    // Reset Engine Setup
+    resetBtn.addEventListener('click', () => {
+      isReviewMode = false;
+      recordedChunks = [];
+      
+      viewfinder.srcObject = null;
+      viewfinder.src = "";
+      viewfinder.srcObject = liveStream;
+      viewfinder.muted = true;
+      viewfinder.controls = false;
+      
+      refVideo.pause();
+      refVideo.currentTime = 0;
+      refVideo.controls = false;
+
+      streamLabel.innerText = "YOU (LIVE CAM)";
+      actionBtn.innerText = "Start Session";
+      actionBtn.disabled = false;
+      resetBtn.disabled = true;
+    });
+
+    function runCountdown() {
+      actionBtn.disabled = true;
+      countdown.classList.add('show');
+      let count = 3;
+      countdown.innerText = count;
+
+      const timer = setInterval(() => {
+        count--;
+        if (count > 0) {
+          countdown.innerText = count;
+        } else {
+          clearInterval(timer);
+          countdown.classList.remove('show');
+          startRecordingSession();
+        }
+      }, 1000);
+    }
+
+    function startRecordingSession() {
+      recordedChunks = [];
+      refVideo.currentTime = 0;
+      
+      const options = { mimeType: 'video/webm;codecs=vp8,opus' };
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options.mimeType = 'video/mp4'; 
+      }
+
+      mediaRecorder = new MediaRecorder(liveStream, options);
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        recBadge.style.display = "none";
+        const videoBlob = new Blob(recordedChunks, { type: recordedChunks[0].type });
+        
+        viewfinder.srcObject = null;
+        viewfinder.src = URL.createObjectURL(videoBlob);
+        viewfinder.muted = false; 
+        viewfinder.controls = true; 
+        refVideo.controls = true; 
+
+        streamLabel.innerText = "YOU (RECORDED REVIEW)";
+        isReviewMode = true;
+        actionBtn.innerText = "Play Review";
+        actionBtn.disabled = false;
+        resetBtn.disabled = false;
+        
+        refVideo.currentTime = 0;
+        viewfinder.currentTime = 0;
+        
+        setupTimelineLocking();
+      };
+
+      mediaRecorder.start();
+      refVideo.play();
+      recBadge.style.display = "block";
+
+      refVideo.onended = () => {
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+          mediaRecorder.stop();
+        }
+      };
+    }
+
+    // Bidirectional timeline locking execution loop
+    function setupTimelineLocking() {
+      refVideo.addEventListener('timeupdate', () => {
+        if (isSyncing) return;
+        isSyncing = true;
+        viewfinder.currentTime = refVideo.currentTime;
+        isSyncing = false;
+      });
+
+      viewfinder.addEventListener('timeupdate', () => {
+        if (isSyncing) return;
+        isSyncing = true;
+        refVideo.currentTime = viewfinder.currentTime;
+        isSyncing = false;
+      });
+
+      refVideo.addEventListener('play', () => { viewfinder.play(); actionBtn.innerText = "Pause Review"; });
+      refVideo.addEventListener('pause', () => { viewfinder.pause(); actionBtn.innerText = "Play Review"; });
+      viewfinder.addEventListener('play', () => { refVideo.play(); actionBtn.innerText = "Pause Review"; });
+      viewfinder.addEventListener('pause', () => { refVideo.pause(); actionBtn.innerText = "Play Review"; });
+    }
+
+    window.addEventListener('DOMContentLoaded', initCamera);
+  </script>
+</body>
+</html>
