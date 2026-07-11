@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V21)</title>
+  <title>Sync Performance Review (V22)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -109,6 +109,10 @@
     .timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #007aff; cursor: pointer; border: 2px solid white; }
     .time-display { font-family: monospace; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
 
+    /* UI ADDITION: Mute button styling */
+    .mute-btn { background: #444; border: none; color: white; padding: 4px 10px; font-size: 11px; font-weight: bold; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 75px; transition: background 0.2s; }
+    .mute-btn.is-muted { background: #ff453a; }
+
     .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
     button { background: #007aff; color: white; border: none; padding: 12px 24px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
     button:active { background: #0056b3; }
@@ -124,7 +128,6 @@
     #resetBtn.danger-active { background: #ff3b30; }
     #resetBtn.danger-active:active { background: #b3241f; }
 
-    /* UI RE-ORDER & RE-LABEL: Modified green action layout */
     #downloadBtn { background: #34c759; display: none; }
     #downloadBtn:active { background: #248a3d; }
 
@@ -139,7 +142,7 @@
 
   <div class="container">
     <div class="box">
-      <div class="label">REFERENCE LESSON</div>
+      <div class="label" id="refLabel">REFERENCE LESSON</div>
       <video id="refVideo" src="https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4" playsinline webkit-playsinline></video>
       <div class="countdown-overlay" id="countdown">3</div>
     </div>
@@ -149,7 +152,7 @@
         <span>YOU (LIVE CAM)</span>
         <span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>
       </div>
-      <div class="rec-indicator" id="recBadge">● HOPU</div>
+      <div class="rec-indicator" id="recBadge">● RECORDING</div>
       
       <div class="viewfinder-container">
         <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
@@ -163,16 +166,16 @@
   </div>
 
   <div class="timeline-footer" id="masterTimeline">
+    <button class="mute-btn" id="muteReviewBtn">🔊 Audio On</button>
     <input type="range" id="scrubSlider" class="timeline-slider" min="0" max="100" step="0.1" value="0">
     <div class="time-display" id="timeLabel">0:00</div>
   </div>
 
-  <!-- Re-ordered element nodes strictly layout based -->
   <div class="controls-footer">
-    <button id="actionBtn">Tīmata</button>
-    <button id="resetBtn" disabled>Anō</button>
-    <button id="downloadBtn">Tikiake</button>
-    <div class="version-tag">V21</div>
+    <button id="actionBtn">Start Session</button>
+    <button id="resetBtn" disabled>Reset / Clear</button>
+    <button id="downloadBtn">Save</button>
+    <div class="version-tag">V22</div>
   </div>
 
   <script>
@@ -181,11 +184,12 @@
     const actionBtn = document.getElementById('actionBtn');
     const resetBtn = document.getElementById('resetBtn');
     const downloadBtn = document.getElementById('downloadBtn');
+    const muteReviewBtn = document.getElementById('muteReviewBtn');
     const countdown = document.getElementById('countdown');
     const recBadge = document.getElementById('recBadge');
     const streamLabel = document.getElementById('streamLabel');
+    const refLabel = document.getElementById('refLabel');
     const cameraBox = document.getElementById('cameraBox');
-    const zoomNote = document.getElementById('zoomNote');
     
     const zoomSlider = document.getElementById('zoomSlider');
     const zoomLabel = document.getElementById('zoomLabel');
@@ -205,6 +209,9 @@
     let zoomFadeTimeout = null;
     let chosenScale = 1;
     let currentVideoBlob = null;
+    
+    // Constant for frame target alignment match
+    const PRE_RECORD_ALIGN_TIME = 20;
 
     async function initCamera() {
       try {
@@ -214,9 +221,23 @@
         });
         viewfinder.srcObject = liveStream;
         resetZoomFadeTimer();
+        
+        // Handle loading video frames dynamically to establish the visual target framework
+        refVideo.addEventListener('loadedmetadata', setAlignmentThumbnail);
+        if (refVideo.readyState >= 1) {
+          setAlignmentThumbnail();
+        }
       } catch (err) {
         alert("Camera and Microphone access required to sync performance.");
         console.error(err);
+      }
+    }
+
+    function setAlignmentThumbnail() {
+      if (!isReviewMode && !isRecordingMode) {
+        // Seek to setup timestamp so users can match position frame
+        refVideo.currentTime = Math.min(PRE_RECORD_ALIGN_TIME, refVideo.duration || PRE_RECORD_ALIGN_TIME);
+        refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing matching thumbnail framework (${PRE_RECORD_ALIGN_TIME}s mark)</span>`;
       }
     }
 
@@ -286,27 +307,34 @@
       actionBtn.click();
     });
 
-    /* FUNCTIONALITY MODIFICATION: Custom Name Input Dialog Prompt */
+    /* FUNCTIONALITY ADDITION: Dynamic audio output controller channel */
+    muteReviewBtn.addEventListener('click', () => {
+      if (!isReviewMode) return;
+      viewfinder.muted = !viewfinder.muted;
+      if (viewfinder.muted) {
+        muteReviewBtn.innerText = "🔇 Muted";
+        muteReviewBtn.classList.add('is-muted');
+      } else {
+        muteReviewBtn.innerText = "🔊 Audio On";
+        muteReviewBtn.classList.remove('is-muted');
+      }
+    });
+
     downloadBtn.addEventListener('click', () => {
       if (!currentVideoBlob) return;
       
-      // Pause playback so looping background doesn't distract user while typing
       if (isReviewMode && !refVideo.paused) {
         pauseBoth();
       }
 
       let customName = prompt("Enter a file name for your video:", `performance-review-${Date.now()}`);
-      
-      // If user clicks cancel, exit gracefully without performing action
       if (customName === null) return;
       
-      // Clean name value whitespace or fallback if blank string submitted
       customName = customName.trim();
       if (!customName) {
         customName = `performance-review-${Date.now()}`;
       }
 
-      // Ensure clean parsing handling file extensions
       if (!customName.toLowerCase().endsWith('.mp4')) {
         customName += '.mp4';
       }
@@ -334,7 +362,7 @@
       chosenScale = 1;
       
       refVideo.pause();
-      refVideo.currentTime = 0;
+      setAlignmentThumbnail();
 
       if (mediaRecorder && mediaRecorder.state !== "inactive") {
         mediaRecorder.stop();
@@ -344,6 +372,11 @@
       viewfinder.src = "";
       viewfinder.srcObject = liveStream;
       viewfinder.muted = true;
+      
+      // Default state layout setups
+      viewfinder.muted = false; 
+      muteReviewBtn.innerText = "🔊 Audio On";
+      muteReviewBtn.classList.remove('is-muted');
       
       masterTimeline.classList.remove('show');
       downloadBtn.style.display = "none";
@@ -373,6 +406,10 @@
       countdown.classList.add('show');
       let count = 3;
       countdown.innerText = count;
+
+      // Unlatch the alignment preview frame anchor ready for runtime capture
+      refVideo.currentTime = 0;
+      refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
 
       const timer = setInterval(() => {
         count--;
@@ -421,6 +458,7 @@
         viewfinder.style.transform = `scale(${chosenScale})`;
         zoomUi.style.display = "none";
 
+        refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
         document.getElementById('streamLabel').innerHTML = `<span>YOU (RECORDED REVIEW)</span><span class="zoom-note" id="zoomNote">Saved video captures standard widescreen frame</span>`;
         isReviewMode = true;
         
