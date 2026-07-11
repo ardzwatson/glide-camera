@@ -30,6 +30,8 @@
     .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; background: #000; transition: transform 0.1s ease-out; transform-origin: center center; }
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 2px; }
+    #refLabel { background: rgba(46, 125, 50, 0.7); } /* Custom Emerald Green Overlay */
+    #streamLabel.review-active { background: rgba(239, 108, 0, 0.7) !important; } /* Custom Amber Orange Overlay */
     .zoom-note { font-size: 8px; color: #aaa; font-weight: normal; }
     .zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); opacity: 1; transition: opacity 0.3s ease; }
     .zoom-container.fade-out { opacity: 0; pointer-events: none; }
@@ -104,7 +106,7 @@
     const scrubSlider = document.getElementById('scrubSlider');
     const timeLabel = document.getElementById('timeLabel');
 
-    let mediaRecorder = null, recordedChunks = [], liveStream = null, isRecordingMode = false, isReviewMode = false, loopInterval = null, isUserScrubbing = false, zoomFadeTimeout = null, chosenScale = 1, currentVideoBlob = null;
+    let mediaRecorder = null, recordedChunks = [], liveStream = null, isRecordingMode = false, isReviewMode = false, loopInterval = null, isUserScrubbing = false, zoomFadeTimeout = null, chosenScale = 1, currentVideoBlob = null, isSeeking = false;
     const PRE_RECORD_ALIGN_TIME = 20;
 
     async function initCamera() {
@@ -125,7 +127,6 @@
         refVideo.currentTime = targetTime;
         refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing alignment framework (${PRE_RECORD_ALIGN_TIME}s)</span>`;
         
-        // Force rendering on background page-loads
         const initialPlayPromise = refVideo.play();
         if (initialPlayPromise !== undefined) {
           initialPlayPromise.then(() => {
@@ -151,7 +152,20 @@
     function playBoth() { viewfinder.play(); refVideo.play(); actionBtn.innerText = "Pause Review"; }
     function shadowPause() { viewfinder.pause(); refVideo.pause(); }
     function pauseBoth() { shadowPause(); actionBtn.innerText = "Play Review"; }
-    function triggerSynchronizedLoop() { shadowPause(); refVideo.currentTime = 0; viewfinder.currentTime = 0; scrubSlider.value = 0; setTimeout(() => { if (isReviewMode) playBoth(); }, 200); }
+    
+    function triggerSynchronizedLoop() { 
+      if (isSeeking) return;
+      isSeeking = true;
+      shadowPause(); 
+      refVideo.currentTime = 0; 
+      viewfinder.currentTime = 0; 
+      scrubSlider.value = 0; 
+      setTimeout(() => { 
+        isSeeking = false;
+        if (isReviewMode && !actionBtn.innerText.includes("Play")) playBoth(); 
+      }, 200); 
+    }
+
     cameraBox.addEventListener('click', (e) => { if (!isReviewMode || e.target.closest('#zoomUi')) return; actionBtn.click(); });
     muteReviewBtn.addEventListener('click', () => {
       if (!isReviewMode) return;
@@ -176,7 +190,9 @@
       viewfinder.srcObject = null; viewfinder.src = ""; viewfinder.srcObject = liveStream; viewfinder.muted = true;
       muteReviewBtn.innerText = "Audio"; muteReviewBtn.classList.remove('is-muted'); masterTimeline.classList.remove('show'); downloadBtn.style.display = "none";
       zoomSlider.value = 1; zoomLabel.innerText = "1.0x"; viewfinder.style.transform = "scale(1)"; zoomUi.style.display = "flex"; resetZoomFadeTimer();
-      recBadge.style.display = "none"; streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
+      recBadge.style.display = "none"; 
+      streamLabel.classList.remove('review-active');
+      streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
       actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
       resetBtn.innerText = "Reset / Clear"; resetBtn.className = "custom-png-btn"; resetBtn.disabled = true;
     });
@@ -192,7 +208,11 @@
         isRecordingMode = false; recBadge.style.display = "none"; clearTimeout(zoomFadeTimeout); if (recordedChunks.length === 0) return;
         currentVideoBlob = new Blob(recordedChunks, { type: 'video/mp4' }); viewfinder.srcObject = null; viewfinder.src = URL.createObjectURL(currentVideoBlob); viewfinder.muted = false;
         viewfinder.setAttribute('playsinline', 'true'); viewfinder.setAttribute('webkit-playsinline', 'true'); viewfinder.style.transform = `scale(${chosenScale})`; zoomUi.style.display = "none";
-        refLabel.innerHTML = `<span>REFERENCE LESSON</span>`; document.getElementById('streamLabel').innerHTML = `<span>YOU (RECORDED REVIEW)</span><span class="zoom-note" id="zoomNote">Saved video captures standard widescreen frame</span>`;
+        refLabel.innerHTML = `<span>REFERENCE LESSON</span>`; 
+        
+        streamLabel.classList.add('review-active');
+        streamLabel.innerHTML = `<span>YOU (RECORDED REVIEW)</span><span class="zoom-note" id="zoomNote">Saved video captures standard widescreen frame</span>`;
+        
         isReviewMode = true; refVideo.pause(); viewfinder.pause(); refVideo.currentTime = 0; viewfinder.currentTime = 0; masterTimeline.classList.add('show'); downloadBtn.style.display = "block"; scrubSlider.value = 0;
         actionBtn.innerText = "Play Review"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false; resetBtn.innerText = "Reset / Clear"; resetBtn.className = "custom-png-btn danger-active"; resetBtn.disabled = false;
         setupMasterTimelineSync(); startLoopEngine();
@@ -202,23 +222,37 @@
       refVideo.onended = () => { if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); };
     }
     function stopRecordingEarly() { refVideo.pause(); if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); }
+    
     function setupMasterTimelineSync() {
-      scrubSlider.addEventListener('input', () => { isUserScrubbing = true; const targetPct = parseFloat(scrubSlider.value); const targetTime = (targetPct / 100) * refVideo.duration; refVideo.currentTime = targetTime; viewfinder.currentTime = targetTime; updateTimeDisplay(targetTime); });
+      scrubSlider.addEventListener('input', () => { 
+        isUserScrubbing = true; 
+        const targetPct = parseFloat(scrubSlider.value); 
+        const targetTime = (targetPct / 100) * refVideo.duration; 
+        refVideo.currentTime = targetTime; 
+        viewfinder.currentTime = targetTime; 
+        updateTimeDisplay(targetTime); 
+      });
       scrubSlider.addEventListener('change', () => { isUserScrubbing = false; });
+      
+      viewfinder.addEventListener('seeking', () => { isSeeking = true; });
+      viewfinder.addEventListener('seeked', () => { isSeeking = false; });
     }
+    
     function updateTimeDisplay(seconds) { const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60); timeLabel.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`; }
+    
     function startLoopEngine() { 
       clearInterval(loopInterval); 
       loopInterval = setInterval(() => { 
-        if (!isReviewMode) return; 
+        if (!isReviewMode || isSeeking) return; 
         if (!refVideo.paused && !isUserScrubbing) { 
           const currentPct = (refVideo.currentTime / refVideo.duration) * 100; 
           scrubSlider.value = currentPct; 
           updateTimeDisplay(refVideo.currentTime); 
           
-          if (viewfinder.duration && !viewfinder.paused) {
+          if (viewfinder.duration && !viewfinder.paused && !viewfinder.seeking) {
             const timeDelta = Math.abs(viewfinder.currentTime - refVideo.currentTime);
-            if (timeDelta > 0.05) {
+            // Only perform frame sync updates if pipeline states match cleanly
+            if (timeDelta > 0.08) {
               viewfinder.currentTime = refVideo.currentTime;
             }
           }
