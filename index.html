@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V23.2)</title>
+  <title>Sync Performance Review (V23.4)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -29,9 +29,10 @@
     .box { position: relative; width: 100%; flex: 1 1 0%; height: 0; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
     .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; background: #000; transition: transform 0.1s ease-out; transform-origin: center center; }
+    video[poster] { object-fit: cover; }
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 2px; }
-    #refLabel { background: rgba(46, 125, 50, 0.7); } /* Custom Emerald Green Overlay */
-    #streamLabel.review-active { background: rgba(239, 108, 0, 0.7) !important; } /* Custom Amber Orange Overlay */
+    #refLabel { background: rgba(46, 125, 50, 0.7); } 
+    #streamLabel.review-active { background: rgba(239, 108, 0, 0.7) !important; } 
     .zoom-note { font-size: 8px; color: #aaa; font-weight: normal; }
     .zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); opacity: 1; transition: opacity 0.3s ease; }
     .zoom-container.fade-out { opacity: 0; pointer-events: none; }
@@ -66,7 +67,10 @@
   <div class="container">
     <div class="box">
       <div class="label" id="refLabel">REFERENCE LESSON</div>
-      <video id="refVideo" src="https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4" preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
+      <video id="refVideo" 
+             src="https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4" 
+             poster="https://res.cloudinary.com/dgz4sxuj5/video/upload/so_20/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.jpg" 
+             preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
       <div class="countdown-overlay" id="countdown">3</div>
     </div>
     <div class="box" id="cameraBox">
@@ -85,7 +89,7 @@
     <button id="actionBtn" class="custom-png-btn">Start Session</button>
     <button id="resetBtn" class="custom-png-btn" disabled>Reset / Clear</button>
     <button id="downloadBtn" class="custom-png-btn">Save</button>
-    <div class="version-tag">V23.2</div>
+    <div class="version-tag">V23.4</div>
   </div>
   <script>
     const refVideo = document.getElementById('refVideo');
@@ -114,28 +118,14 @@
         liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 360 } }, audio: true });
         viewfinder.srcObject = liveStream;
         resetZoomFadeTimer();
-        refVideo.addEventListener('loadedmetadata', setAlignmentThumbnail);
-        refVideo.addEventListener('loadeddata', setAlignmentThumbnail);
-        refVideo.addEventListener('canplay', setAlignmentThumbnail);
-        if (refVideo.readyState >= 1) setAlignmentThumbnail();
+        setupInitialState();
       } catch (err) { alert("Camera and Microphone access required."); console.error(err); }
     }
     
-    function setAlignmentThumbnail() {
+    function setupInitialState() {
       if (!isReviewMode && !isRecordingMode) {
-        const targetTime = Math.min(PRE_RECORD_ALIGN_TIME, refVideo.duration || PRE_RECORD_ALIGN_TIME);
-        refVideo.currentTime = targetTime;
+        refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
         refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing alignment framework (${PRE_RECORD_ALIGN_TIME}s)</span>`;
-        
-        const initialPlayPromise = refVideo.play();
-        if (initialPlayPromise !== undefined) {
-          initialPlayPromise.then(() => {
-            refVideo.pause();
-            refVideo.currentTime = targetTime;
-          }).catch(error => {
-            console.log("Forced pipeline update deferred until user interactions fire:", error);
-          });
-        }
       }
     }
     
@@ -185,7 +175,7 @@
       setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
     });
     resetBtn.addEventListener('click', () => {
-      clearInterval(loopInterval); clearTimeout(zoomFadeTimeout); isRecordingMode = false; isReviewMode = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1; refVideo.pause(); setAlignmentThumbnail();
+      clearInterval(loopInterval); clearTimeout(zoomFadeTimeout); isRecordingMode = false; isReviewMode = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1; refVideo.pause(); setupInitialState();
       if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
       viewfinder.srcObject = null; viewfinder.src = ""; viewfinder.srcObject = liveStream; viewfinder.muted = true;
       muteReviewBtn.innerText = "Audio"; muteReviewBtn.classList.remove('is-muted'); masterTimeline.classList.remove('show'); downloadBtn.style.display = "none";
@@ -251,7 +241,6 @@
           
           if (viewfinder.duration && !viewfinder.paused && !viewfinder.seeking) {
             const timeDelta = Math.abs(viewfinder.currentTime - refVideo.currentTime);
-            // Only perform frame sync updates if pipeline states match cleanly
             if (timeDelta > 0.08) {
               viewfinder.currentTime = refVideo.currentTime;
             }
@@ -264,7 +253,7 @@
         } 
       }, 50); 
     }
-    window.addEventListener('load', () => { initCamera(); setTimeout(setAlignmentThumbnail, 400); });
+    window.addEventListener('load', initCamera);
     window.addEventListener('DOMContentLoaded', initCamera);
   </script>
 </body>
