@@ -42,10 +42,10 @@
     .timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #007aff; cursor: pointer; border: 2px solid white; }
     .time-display { font-family: 'Marcellus', serif; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
     .mute-btn-container { display: flex; align-items: center; justify-content: center; }
-    .mute-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; border: none; width: 90px; height: 32px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.8); background-color: #444; border-radius: 6px; background-image: url('images/audio-on.png'); }
+    .mute-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; border: none; width: 90px; height: 32px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); background-color: #444; border-radius: 6px; background-image: url('images/audio-on.png'); }
     .mute-btn.is-muted { background-color: #ff453a; background-image: url('images/audio-muted.png'); }
     .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
-    button.custom-png-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: transparent; border: none; width: 140px; height: 44px; cursor: pointer; font-size: 13px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; transition: transform 0.1s ease, filter 0.2s; }
+    button.custom-png-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: transparent; border: none; width: 140px; height: 44px; cursor: pointer; font-size: 13px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; transition: transform 0.1s ease, filter 0.2s; }
     button.custom-png-btn:active { transform: scale(0.96); filter: brightness(0.85); }
     button.custom-png-btn:disabled { filter: grayscale(1) opacity(0.4); cursor: not-allowed; transform: none; }
     #actionBtn { background-color: #007aff; border-radius: 8px; background-image: url('images/start-btn.png'); }
@@ -118,12 +118,26 @@
         if (refVideo.readyState >= 1) setAlignmentThumbnail();
       } catch (err) { alert("Camera and Microphone access required."); console.error(err); }
     }
+    
     function setAlignmentThumbnail() {
       if (!isReviewMode && !isRecordingMode) {
-        refVideo.currentTime = Math.min(PRE_RECORD_ALIGN_TIME, refVideo.duration || PRE_RECORD_ALIGN_TIME);
+        const targetTime = Math.min(PRE_RECORD_ALIGN_TIME, refVideo.duration || PRE_RECORD_ALIGN_TIME);
+        refVideo.currentTime = targetTime;
         refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing alignment framework (${PRE_RECORD_ALIGN_TIME}s)</span>`;
+        
+        // Force rendering on background page-loads
+        const initialPlayPromise = refVideo.play();
+        if (initialPlayPromise !== undefined) {
+          initialPlayPromise.then(() => {
+            refVideo.pause();
+            refVideo.currentTime = targetTime;
+          }).catch(error => {
+            console.log("Forced pipeline update deferred until user interactions fire:", error);
+          });
+        }
       }
     }
+    
     function resetZoomFadeTimer() {
       if (isReviewMode) return;
       zoomUi.classList.remove('fade-out');
