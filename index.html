@@ -3,11 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V23)</title>
+  <title>Sync Performance Review (V23.1)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Font Link Integration for Marcellus -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
 
   <style>
     body, html { 
@@ -17,7 +22,7 @@
       box-sizing: border-box; 
       background: #111; 
       color: white; 
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+      font-family: 'Marcellus', -apple-system, BlinkMacSystemFont, serif; 
       overflow: hidden; 
       display: flex;
       flex-direction: column;
@@ -71,7 +76,6 @@
         margin-top: 4px !important;
       }
       
-      /* Scale sizing adjustments for image-based control triggers */
       button.custom-png-btn {
         width: 110px !important;
         height: 34px !important;
@@ -104,7 +108,7 @@
 
     .zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); opacity: 1; transition: opacity 0.3s ease; }
     .zoom-container.fade-out { opacity: 0; pointer-events: none; }
-    .zoom-container label { font-size: 10px; font-weight: bold; font-family: monospace; min-width: 24px; text-align: center; color: #007aff; }
+    .zoom-container label { font-size: 10px; font-weight: bold; font-family: 'Marcellus', serif; min-width: 24px; text-align: center; color: #007aff; }
     .zoom-slider { -webkit-appearance: none; appearance: none; width: 100px; height: 4px; background: #444; border-radius: 2px; outline: none; }
     .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #007aff; cursor: pointer; }
 
@@ -112,12 +116,12 @@
     .timeline-footer.show { display: flex; }
     .timeline-slider { flex-grow: 1; -webkit-appearance: none; appearance: none; height: 6px; background: #333; border-radius: 3px; outline: none; }
     .timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #007aff; cursor: pointer; border: 2px solid white; }
-    .time-display { font-family: monospace; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
+    .time-display { font-family: 'Marcellus', serif; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
 
-    /* UI RELOCATION & CUSTOM DESIGN: Relocated Mute Layout frame wrapper */
     .mute-btn-container { display: flex; align-items: center; justify-content: center; }
     
     .mute-btn {
+      font-family: 'Marcellus', serif;
       background-size: contain;
       background-repeat: no-repeat;
       background-position: center;
@@ -126,14 +130,12 @@
       width: 90px;
       height: 32px;
       cursor: pointer;
-      font-size: 11px;
+      font-size: 12px;
       font-weight: bold;
       color: white;
       text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-      /* Fallback style color if image asset doesn't load */
       background-color: #444; 
       border-radius: 6px;
-      /* SWAP TARGET: Replace url() payload when custom PNG assets are deployed */
       background-image: url('images/audio-on.png'); 
     }
     .mute-btn.is-muted {
@@ -143,8 +145,8 @@
 
     .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
     
-    /* PNG MASTER DESIGN ENGINE CLASSES */
     button.custom-png-btn {
+      font-family: 'Marcellus', serif;
       background-size: contain;
       background-repeat: no-repeat;
       background-position: center;
@@ -165,7 +167,6 @@
     button.custom-png-btn:active { transform: scale(0.96); filter: brightness(0.85); }
     button.custom-png-btn:disabled { filter: grayscale(1) opacity(0.4); cursor: not-allowed; transform: none; }
     
-    /* INDIVIDUAL SYSTEM OVERRIDES (Swap out the background-colors/images below with your custom files) */
     #actionBtn { 
       background-color: #007aff; 
       border-radius: 8px;
@@ -193,7 +194,7 @@
       display: none; 
     }
 
-    .version-tag { color: #556; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: monospace; position: absolute; right: 4px; }
+    .version-tag { color: #556; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: 'Marcellus', serif; position: absolute; right: 4px; }
     .countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: #fff; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
     .countdown-overlay.show { opacity: 1; }
     
@@ -206,8 +207,7 @@
   <div class="container">
     <div class="box">
       <div class="label" id="refLabel">REFERENCE LESSON</div>
-      <!-- ADDITION: Forced pre-loading to fix initial frame render blank states -->
-      <video id="refVideo" src="https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4" preload="metadata" playsinline webkit-playsinline></video>
+      <video id="refVideo" src="https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4" preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
       <div class="countdown-overlay" id="countdown">3</div>
     </div>
 
@@ -232,9 +232,9 @@
   <div class="timeline-footer" id="masterTimeline">
     <input type="range" id="scrubSlider" class="timeline-slider" min="0" max="100" step="0.1" value="0">
     <div class="time-display" id="timeLabel">0:00</div>
-    <!-- RELOCATION: Mute button shifted under the review video player side -->
     <div class="mute-btn-container">
-      <button class="mute-btn" id="muteReviewBtn">🔊 Audio On</button>
+      <!-- RENAME: Shortened text label config to match updated schema -->
+      <button class="mute-btn" id="muteReviewBtn">🔊 Audio</button>
     </div>
   </div>
 
@@ -242,7 +242,7 @@
     <button id="actionBtn" class="custom-png-btn">Start Session</button>
     <button id="resetBtn" class="custom-png-btn" disabled>Reset / Clear</button>
     <button id="downloadBtn" class="custom-png-btn">Save</button>
-    <div class="version-tag">V23</div>
+    <div class="version-tag">V23.1</div>
   </div>
 
   <script>
@@ -288,9 +288,9 @@
         viewfinder.srcObject = liveStream;
         resetZoomFadeTimer();
         
-        // Setup cross-browser events to force render thumbnail on initial page loading sequence
         refVideo.addEventListener('loadedmetadata', setAlignmentThumbnail);
         refVideo.addEventListener('loadeddata', setAlignmentThumbnail);
+        refVideo.addEventListener('canplay', setAlignmentThumbnail);
         if (refVideo.readyState >= 1) {
           setAlignmentThumbnail();
         }
@@ -303,7 +303,7 @@
     function setAlignmentThumbnail() {
       if (!isReviewMode && !isRecordingMode) {
         refVideo.currentTime = Math.min(PRE_RECORD_ALIGN_TIME, refVideo.duration || PRE_RECORD_ALIGN_TIME);
-        refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing matching thumbnail framework (${PRE_RECORD_ALIGN_TIME}s mark)</span>`;
+        refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing alignment framework (${PRE_RECORD_ALIGN_TIME}s)</span>`;
       }
     }
 
@@ -380,7 +380,7 @@
         muteReviewBtn.innerText = "🔇 Muted";
         muteReviewBtn.classList.add('is-muted');
       } else {
-        muteReviewBtn.innerText = "🔊 Audio On";
+        muteReviewBtn.innerText = "🔊 Audio";
         muteReviewBtn.classList.remove('is-muted');
       }
     });
@@ -427,7 +427,6 @@
       chosenScale = 1;
       
       refVideo.pause();
-      // Instantly forces render fallback thumb loop frame back safely
       setAlignmentThumbnail();
 
       if (mediaRecorder && mediaRecorder.state !== "inactive") {
@@ -439,7 +438,7 @@
       viewfinder.srcObject = liveStream;
       viewfinder.muted = true;
       
-      muteReviewBtn.innerText = "🔊 Audio On";
+      muteReviewBtn.innerText = "🔊 Audio";
       muteReviewBtn.classList.remove('is-muted');
       
       masterTimeline.classList.remove('show');
@@ -615,10 +614,9 @@
       }, 50);
     }
 
-    // Force call sequence absolute initial execution target window frame
     window.addEventListener('load', () => {
       initCamera();
-      setTimeout(setAlignmentThumbnail, 500);
+      setTimeout(setAlignmentThumbnail, 400);
     });
     window.addEventListener('DOMContentLoaded', initCamera);
   </script>
