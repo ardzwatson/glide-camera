@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V22)</title>
+  <title>Sync Performance Review (V23)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -70,10 +70,15 @@
         height: 42px !important;
         margin-top: 4px !important;
       }
-      button {
-        padding: 8px 16px !important;
-        font-size: 12px !important;
-        border-radius: 6px !important;
+      
+      /* Scale sizing adjustments for image-based control triggers */
+      button.custom-png-btn {
+        width: 110px !important;
+        height: 34px !important;
+      }
+      .mute-btn-container button {
+        width: 80px !important;
+        height: 26px !important;
       }
     }
 
@@ -109,28 +114,86 @@
     .timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #007aff; cursor: pointer; border: 2px solid white; }
     .time-display { font-family: monospace; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
 
-    /* UI ADDITION: Mute button styling */
-    .mute-btn { background: #444; border: none; color: white; padding: 4px 10px; font-size: 11px; font-weight: bold; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 75px; transition: background 0.2s; }
-    .mute-btn.is-muted { background: #ff453a; }
-
-    .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
-    button { background: #007aff; color: white; border: none; padding: 12px 24px; font-size: 14px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
-    button:active { background: #0056b3; }
-    button:disabled { background: #444; color: #888; cursor: not-allowed; }
+    /* UI RELOCATION & CUSTOM DESIGN: Relocated Mute Layout frame wrapper */
+    .mute-btn-container { display: flex; align-items: center; justify-content: center; }
     
+    .mute-btn {
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      background-color: transparent;
+      border: none;
+      width: 90px;
+      height: 32px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: bold;
+      color: white;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+      /* Fallback style color if image asset doesn't load */
+      background-color: #444; 
+      border-radius: 6px;
+      /* SWAP TARGET: Replace url() payload when custom PNG assets are deployed */
+      background-image: url('images/audio-on.png'); 
+    }
+    .mute-btn.is-muted {
+      background-color: #ff453a;
+      background-image: url('images/audio-muted.png');
+    }
+
+    .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
+    
+    /* PNG MASTER DESIGN ENGINE CLASSES */
+    button.custom-png-btn {
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      background-color: transparent;
+      border: none;
+      width: 140px;
+      height: 44px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+      color: white;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.1s ease, filter 0.2s;
+    }
+    button.custom-png-btn:active { transform: scale(0.96); filter: brightness(0.85); }
+    button.custom-png-btn:disabled { filter: grayscale(1) opacity(0.4); cursor: not-allowed; transform: none; }
+    
+    /* INDIVIDUAL SYSTEM OVERRIDES (Swap out the background-colors/images below with your custom files) */
+    #actionBtn { 
+      background-color: #007aff; 
+      border-radius: 8px;
+      background-image: url('images/start-btn.png'); 
+    }
+    #actionBtn.btn-recording { 
+      background-color: #ff453a !important; 
+      background-image: url('images/stop-btn.png') !important;
+    }
+    
+    #resetBtn { 
+      background-color: #8e8e93; 
+      border-radius: 8px;
+      background-image: url('images/reset-btn.png'); 
+    }
+    #resetBtn.danger-active { 
+      background-color: #ff3b30; 
+      background-image: url('images/clear-btn.png');
+    }
+
+    #downloadBtn { 
+      background-color: #34c759; 
+      border-radius: 8px;
+      background-image: url('images/save-btn.png'); 
+      display: none; 
+    }
+
     .version-tag { color: #556; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: monospace; position: absolute; right: 4px; }
-    
-    .btn-recording { background: #ff453a !important; }
-    .btn-recording:active { background: #ff3b30 !important; }
-    
-    #resetBtn { background: #8e8e93; }
-    #resetBtn:active { background: #636366; }
-    #resetBtn.danger-active { background: #ff3b30; }
-    #resetBtn.danger-active:active { background: #b3241f; }
-
-    #downloadBtn { background: #34c759; display: none; }
-    #downloadBtn:active { background: #248a3d; }
-
     .countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: #fff; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
     .countdown-overlay.show { opacity: 1; }
     
@@ -143,7 +206,8 @@
   <div class="container">
     <div class="box">
       <div class="label" id="refLabel">REFERENCE LESSON</div>
-      <video id="refVideo" src="https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4" playsinline webkit-playsinline></video>
+      <!-- ADDITION: Forced pre-loading to fix initial frame render blank states -->
+      <video id="refVideo" src="https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4" preload="metadata" playsinline webkit-playsinline></video>
       <div class="countdown-overlay" id="countdown">3</div>
     </div>
 
@@ -166,16 +230,19 @@
   </div>
 
   <div class="timeline-footer" id="masterTimeline">
-    <button class="mute-btn" id="muteReviewBtn">🔊 Audio On</button>
     <input type="range" id="scrubSlider" class="timeline-slider" min="0" max="100" step="0.1" value="0">
     <div class="time-display" id="timeLabel">0:00</div>
+    <!-- RELOCATION: Mute button shifted under the review video player side -->
+    <div class="mute-btn-container">
+      <button class="mute-btn" id="muteReviewBtn">🔊 Audio On</button>
+    </div>
   </div>
 
   <div class="controls-footer">
-    <button id="actionBtn">Start Session</button>
-    <button id="resetBtn" disabled>Reset / Clear</button>
-    <button id="downloadBtn">Save</button>
-    <div class="version-tag">V22</div>
+    <button id="actionBtn" class="custom-png-btn">Start Session</button>
+    <button id="resetBtn" class="custom-png-btn" disabled>Reset / Clear</button>
+    <button id="downloadBtn" class="custom-png-btn">Save</button>
+    <div class="version-tag">V23</div>
   </div>
 
   <script>
@@ -210,7 +277,6 @@
     let chosenScale = 1;
     let currentVideoBlob = null;
     
-    // Constant for frame target alignment match
     const PRE_RECORD_ALIGN_TIME = 20;
 
     async function initCamera() {
@@ -222,8 +288,9 @@
         viewfinder.srcObject = liveStream;
         resetZoomFadeTimer();
         
-        // Handle loading video frames dynamically to establish the visual target framework
+        // Setup cross-browser events to force render thumbnail on initial page loading sequence
         refVideo.addEventListener('loadedmetadata', setAlignmentThumbnail);
+        refVideo.addEventListener('loadeddata', setAlignmentThumbnail);
         if (refVideo.readyState >= 1) {
           setAlignmentThumbnail();
         }
@@ -235,7 +302,6 @@
 
     function setAlignmentThumbnail() {
       if (!isReviewMode && !isRecordingMode) {
-        // Seek to setup timestamp so users can match position frame
         refVideo.currentTime = Math.min(PRE_RECORD_ALIGN_TIME, refVideo.duration || PRE_RECORD_ALIGN_TIME);
         refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing matching thumbnail framework (${PRE_RECORD_ALIGN_TIME}s mark)</span>`;
       }
@@ -307,7 +373,6 @@
       actionBtn.click();
     });
 
-    /* FUNCTIONALITY ADDITION: Dynamic audio output controller channel */
     muteReviewBtn.addEventListener('click', () => {
       if (!isReviewMode) return;
       viewfinder.muted = !viewfinder.muted;
@@ -362,6 +427,7 @@
       chosenScale = 1;
       
       refVideo.pause();
+      // Instantly forces render fallback thumb loop frame back safely
       setAlignmentThumbnail();
 
       if (mediaRecorder && mediaRecorder.state !== "inactive") {
@@ -373,8 +439,6 @@
       viewfinder.srcObject = liveStream;
       viewfinder.muted = true;
       
-      // Default state layout setups
-      viewfinder.muted = false; 
       muteReviewBtn.innerText = "🔊 Audio On";
       muteReviewBtn.classList.remove('is-muted');
       
@@ -391,11 +455,11 @@
       streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
       
       actionBtn.innerText = "Start Session";
-      actionBtn.className = ""; 
+      actionBtn.className = "custom-png-btn"; 
       actionBtn.disabled = false;
       
       resetBtn.innerText = "Reset / Clear";
-      resetBtn.className = "";
+      resetBtn.className = "custom-png-btn";
       resetBtn.disabled = true;
     });
 
@@ -407,7 +471,6 @@
       let count = 3;
       countdown.innerText = count;
 
-      // Unlatch the alignment preview frame anchor ready for runtime capture
       refVideo.currentTime = 0;
       refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
 
@@ -473,11 +536,11 @@
         scrubSlider.value = 0;
 
         actionBtn.innerText = "Play Review";
-        actionBtn.className = ""; 
+        actionBtn.className = "custom-png-btn"; 
         actionBtn.disabled = false;
         
         resetBtn.innerText = "Reset / Clear";
-        resetBtn.className = "danger-active"; 
+        resetBtn.className = "custom-png-btn danger-active"; 
         resetBtn.disabled = false;
         
         setupMasterTimelineSync();
@@ -493,7 +556,7 @@
       
       recBadge.style.display = "block";
       actionBtn.innerText = "Stop & Review";
-      actionBtn.className = "btn-recording";
+      actionBtn.className = "custom-png-btn btn-recording";
       actionBtn.disabled = false;
 
       resetBtn.innerText = "Cancel Run";
@@ -552,6 +615,11 @@
       }, 50);
     }
 
+    // Force call sequence absolute initial execution target window frame
+    window.addEventListener('load', () => {
+      initCamera();
+      setTimeout(setAlignmentThumbnail, 500);
+    });
     window.addEventListener('DOMContentLoaded', initCamera);
   </script>
 </body>
