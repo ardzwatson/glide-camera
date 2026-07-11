@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V23.5)</title>
+  <title>Sync Performance Review (V23.6)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -41,7 +41,11 @@
     video[poster] { object-fit: cover; }
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 2px; }
     #refLabel { background: rgba(46, 125, 50, 0.7); } 
-    #streamLabel.review-active { background: rgba(239, 108, 0, 0.7) !important; } 
+    
+    /* Updated background colors for Live Cam vs Recorded Review */
+    #streamLabel { background: rgba(139, 0, 0, 0.7); } /* Dark Red for Live Cam */
+    #streamLabel.review-active { background: rgba(0, 0, 0, 0.7) !important; } /* Solid Black with opacity for Review */
+    
     .zoom-note { font-size: 8px; color: #aaa; font-weight: normal; }
     .zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); opacity: 1; transition: opacity 0.3s ease; }
     .zoom-container.fade-out { opacity: 0; pointer-events: none; }
@@ -92,13 +96,13 @@
   <div class="timeline-footer" id="masterTimeline">
     <input type="range" id="scrubSlider" class="timeline-slider" min="0" max="100" step="0.1" value="0">
     <div class="time-display" id="timeLabel">0:00</div>
-    <div class="mute-btn-container"><button class="mute-btn" id="muteReviewBtn">🔊 Audio</button></div>
+    <div class="mute-btn-container"><button class="mute-btn" id="muteReviewBtn">Muted</button></div>
   </div>
   <div class="controls-footer">
     <button id="actionBtn" class="custom-png-btn">Start Session</button>
     <button id="resetBtn" class="custom-png-btn" disabled>Reset / Clear</button>
     <button id="downloadBtn" class="custom-png-btn">Save</button>
-    <div class="version-tag">V23.5</div>
+    <div class="version-tag">V23.6</div>
   </div>
   <script>
     const refVideo = document.getElementById('refVideo');
@@ -166,12 +170,14 @@
     }
 
     cameraBox.addEventListener('click', (e) => { if (!isReviewMode || e.target.closest('#zoomUi')) return; actionBtn.click(); });
+    
     muteReviewBtn.addEventListener('click', () => {
       if (!isReviewMode) return;
       viewfinder.muted = !viewfinder.muted;
       if (viewfinder.muted) { muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted'); }
       else { muteReviewBtn.innerText = "Audio"; muteReviewBtn.classList.remove('is-muted'); }
     });
+    
     downloadBtn.addEventListener('click', () => {
       if (!currentVideoBlob) return;
       if (isReviewMode && !refVideo.paused) pauseBoth();
@@ -183,11 +189,17 @@
       a.style.display = 'none'; a.href = url; a.download = customName; document.body.appendChild(a); a.click();
       setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
     });
+    
     resetBtn.addEventListener('click', () => {
       clearInterval(loopInterval); clearTimeout(zoomFadeTimeout); isRecordingMode = false; isReviewMode = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1; refVideo.pause(); setupInitialState();
       if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
-      viewfinder.srcObject = null; viewfinder.src = ""; viewfinder.srcObject = liveStream; viewfinder.muted = true;
-      muteReviewBtn.innerText = "Audio"; muteReviewBtn.classList.remove('is-muted'); masterTimeline.classList.remove('show'); downloadBtn.style.display = "none";
+      viewfinder.srcObject = null; viewfinder.src = ""; viewfinder.srcObject = liveStream; 
+      
+      // Reset default muted state variables
+      viewfinder.muted = true;
+      muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
+      
+      masterTimeline.classList.remove('show'); downloadBtn.style.display = "none";
       zoomSlider.value = 1; zoomLabel.innerText = "1.0x"; viewfinder.style.transform = "scale(1)"; zoomUi.style.display = "flex"; resetZoomFadeTimer();
       recBadge.style.display = "none"; 
       streamLabel.classList.remove('review-active');
@@ -195,17 +207,25 @@
       actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
       resetBtn.innerText = "Reset / Clear"; resetBtn.className = "custom-png-btn"; resetBtn.disabled = true;
     });
+    
     function runCountdown() {
       actionBtn.disabled = true; resetBtn.disabled = true; downloadBtn.style.display = "none"; countdown.classList.add('show'); let count = 3; countdown.innerText = count; refVideo.currentTime = 0; refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
       const timer = setInterval(() => { count--; if (count > 0) { countdown.innerText = count; } else { clearInterval(timer); countdown.classList.remove('show'); startRecordingSession(); } }, 1000);
     }
+    
     function startRecordingSession() {
       recordedChunks = []; currentVideoBlob = null; refVideo.currentTime = 0; isRecordingMode = true;
       try { mediaRecorder = new MediaRecorder(liveStream); } catch (e) { console.error(e); }
       mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
       mediaRecorder.onstop = () => {
         isRecordingMode = false; recBadge.style.display = "none"; clearTimeout(zoomFadeTimeout); if (recordedChunks.length === 0) return;
-        currentVideoBlob = new Blob(recordedChunks, { type: 'video/mp4' }); viewfinder.srcObject = null; viewfinder.src = URL.createObjectURL(currentVideoBlob); viewfinder.muted = false;
+        currentVideoBlob = new Blob(recordedChunks, { type: 'video/mp4' }); viewfinder.srcObject = null; viewfinder.src = URL.createObjectURL(currentVideoBlob); 
+        
+        // Mute recorded player by default for review mode execution
+        viewfinder.muted = true;
+        muteReviewBtn.innerText = "Muted";
+        muteReviewBtn.classList.add('is-muted');
+        
         viewfinder.setAttribute('playsinline', 'true'); viewfinder.setAttribute('webkit-playsinline', 'true'); viewfinder.style.transform = `scale(${chosenScale})`; zoomUi.style.display = "none";
         refLabel.innerHTML = `<span>REFERENCE LESSON</span>`; 
         
@@ -262,6 +282,10 @@
         } 
       }, 50); 
     }
+    
+    // Set initial mute UI state properly on load
+    muteReviewBtn.classList.add('is-muted');
+    
     window.addEventListener('load', initCamera);
     window.addEventListener('DOMContentLoaded', initCamera);
   </script>
