@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V25.1)</title>
+  <title>Sync Performance Review (V25.2)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -84,7 +84,9 @@
     
     #actionBtn { background-color: #007aff; border-radius: 8px; background-image: url('images/start-btn.png'); }
     #actionBtn.btn-recording { background-color: #ff453a !important; background-image: url('images/stop-btn.png') !important; }
-    #resetBtn { background-color: #8e8e93; border-radius: 8px; background-image: url('images/reset-btn.png'); }
+    
+    /* Dynamic reset visibility profiles */
+    #resetBtn { background-color: #8e8e93; border-radius: 8px; background-image: url('images/reset-btn.png'); display: none; }
     #resetBtn.danger-active { background-color: #ff3b30; background-image: url('images/clear-btn.png'); }
     
     #overlayToggleBtn { background-color: #e5e5ea; color: #1c1c1e; border-radius: 8px; text-shadow: none; background-image: url('images/overlay-btn.png'); }
@@ -146,7 +148,6 @@
     <button id="actionBtn" class="custom-png-btn">Start Session</button>
     <button id="resetBtn" class="custom-png-btn" disabled>Reset / Clear</button>
     <button id="overlayToggleBtn" class="custom-png-btn">Overlay On</button>
-    <!-- Streamlined Dropdown Selection Options -->
     <select id="opacitySelector" class="custom-select-ui">
       <option value="0.1">10%</option>
       <option value="0.2">20%</option>
@@ -160,7 +161,7 @@
       <option value="1.0">100%</option>
     </select>
     <button id="downloadBtn" class="custom-png-btn">Save</button>
-    <div class="version-tag">V25.1</div>
+    <div class="version-tag">V25.2</div>
   </div>
   <script>
     const refVideo = document.getElementById('refVideo');
@@ -308,10 +309,13 @@
       
       actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
       resetBtn.innerText = "Reset / Clear"; resetBtn.className = "custom-png-btn"; resetBtn.disabled = true;
+      resetBtn.style.display = "none"; // Hide button immediately on reset completion
     });
     
     function runCountdown() {
-      actionBtn.disabled = true; overlayToggleBtn.disabled = true; opacitySelector.disabled = true; resetBtn.disabled = true; downloadBtn.style.display = "none"; countdown.classList.add('show'); let count = 3; countdown.innerText = count; refVideo.currentTime = 0; refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
+      actionBtn.disabled = true; overlayToggleBtn.disabled = true; opacitySelector.disabled = true; 
+      resetBtn.disabled = true; resetBtn.style.display = "none"; // Ensure hidden during countdown
+      downloadBtn.style.display = "none"; countdown.classList.add('show'); let count = 3; countdown.innerText = count; refVideo.currentTime = 0; refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
       const timer = setInterval(() => { count--; if (count > 0) { countdown.innerText = count; } else { clearInterval(timer); countdown.classList.remove('show'); startRecordingSession(); } }, 1000);
     }
     
@@ -339,11 +343,17 @@
         streamLabel.innerHTML = `<span>YOU (RECORDED REVIEW)</span><span class="zoom-note" id="zoomNote">Saved video captures standard widescreen frame</span>`;
         
         isReviewMode = true; refVideo.pause(); viewfinder.pause(); refVideo.currentTime = 0; viewfinder.currentTime = 0; masterTimeline.classList.add('show'); downloadBtn.style.display = "block"; scrubSlider.value = 0;
-        actionBtn.innerText = "Play Review"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false; resetBtn.innerText = "Reset / Clear"; resetBtn.className = "custom-png-btn danger-active"; resetBtn.disabled = false;
+        actionBtn.innerText = "Play Review"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false; 
+        
+        // Show complete session clear option
+        resetBtn.innerText = "Reset / Clear"; resetBtn.className = "custom-png-btn danger-active"; resetBtn.disabled = false; resetBtn.style.display = "flex";
         setupMasterTimelineSync(); startLoopEngine();
       };
       mediaRecorder.start(); setTimeout(() => { if (isRecordingMode) refVideo.play(); }, 250);
-      recBadge.style.display = "block"; actionBtn.innerText = "Stop & Review"; actionBtn.className = "custom-png-btn btn-recording"; actionBtn.disabled = false; resetBtn.innerText = "Cancel Run"; resetBtn.disabled = false;
+      recBadge.style.display = "block"; actionBtn.innerText = "Stop & Review"; actionBtn.className = "custom-png-btn btn-recording"; actionBtn.disabled = false; 
+      
+      // Reveal button as an available "Cancel Run" action during capture
+      resetBtn.innerText = "Cancel Run"; resetBtn.disabled = false; resetBtn.style.display = "flex";
       refVideo.onended = () => { if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); };
     }
     function stopRecordingEarly() { refVideo.pause(); if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); }
