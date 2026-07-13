@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V24.0)</title>
+  <title>Sync Performance Review (V24.1)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -41,7 +41,7 @@
       opacity: 0.35;
       pointer-events: none;
       z-index: 5;
-      display: block; /* Managed via JS classes */
+      display: block;
       transition: opacity 0.2s ease, transform 0.1s ease-out;
       transform-origin: center center;
     }
@@ -83,10 +83,13 @@
     
     #actionBtn { background-color: #007aff; border-radius: 8px; background-image: url('images/start-btn.png'); }
     #actionBtn.btn-recording { background-color: #ff453a !important; background-image: url('images/stop-btn.png') !important; }
-    #overlayToggleBtn { background-color: #5856d6; border-radius: 8px; background-image: url('images/overlay-btn.png'); }
-    #overlayToggleBtn.overlay-off { background-color: #444 !important; opacity: 0.7; }
     #resetBtn { background-color: #8e8e93; border-radius: 8px; background-image: url('images/reset-btn.png'); }
     #resetBtn.danger-active { background-color: #ff3b30; background-image: url('images/clear-btn.png'); }
+    
+    /* Configured Overlay button to elegant Light Grey layout */
+    #overlayToggleBtn { background-color: #e5e5ea; color: #1c1c1e; border-radius: 8px; text-shadow: none; background-image: url('images/overlay-btn.png'); }
+    #overlayToggleBtn.overlay-off { background-color: #444 !important; color: white !important; opacity: 0.7; }
+    
     #downloadBtn { background-color: #34c759; border-radius: 8px; background-image: url('images/save-btn.png'); display: none; }
     .version-tag { color: #556; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: 'Marcellus', serif; position: absolute; right: 4px; }
     .countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: #fff; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
@@ -110,7 +113,6 @@
       <div class="rec-indicator" id="recBadge">● RECORDING</div>
       <div class="viewfinder-container">
         <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
-        <!-- Transparent thumbnail layer alignment mask -->
         <div id="cameraOverlay" class="viewfinder-overlay"></div>
       </div>
       <div class="zoom-container" id="zoomUi"><input type="range" id="zoomSlider" class="zoom-slider" min="1" max="2" step="0.1" value="1"><label id="zoomLabel">1.0x</label></div>
@@ -123,10 +125,10 @@
   </div>
   <div class="controls-footer">
     <button id="actionBtn" class="custom-png-btn">Start Session</button>
-    <button id="overlayToggleBtn" class="custom-png-btn">Overlay On</button>
     <button id="resetBtn" class="custom-png-btn" disabled>Reset / Clear</button>
+    <button id="overlayToggleBtn" class="custom-png-btn">Overlay On</button>
     <button id="downloadBtn" class="custom-png-btn">Save</button>
-    <div class="version-tag">V24.0</div>
+    <div class="version-tag">V24.1</div>
   </div>
   <script>
     const refVideo = document.getElementById('refVideo');
@@ -187,9 +189,8 @@
       resetZoomFadeTimer(); 
     });
 
-    // Control structural UI visibility state of transparency mask manually
     overlayToggleBtn.addEventListener('click', () => {
-      if (isReviewMode) return; // Feature locked to capture frame only
+      if (isReviewMode) return;
       overlayActive = !overlayActive;
       if (overlayActive) {
         cameraOverlay.classList.remove('hidden');
@@ -280,7 +281,6 @@
         muteReviewBtn.innerText = "Muted";
         muteReviewBtn.classList.add('is-muted');
         
-        // Make absolutely sure overlay frame hides during actual review playback
         cameraOverlay.classList.add('hidden');
         overlayToggleBtn.disabled = true;
         
