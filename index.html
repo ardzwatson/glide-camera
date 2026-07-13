@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V24.1)</title>
+  <title>Sync Performance Review (V25.0)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -23,7 +23,7 @@
       .zoom-container { bottom: 6px !important; padding: 4px 8px !important; }
       .timeline-footer { height: 28px !important; margin-top: 4px !important; gap: 8px !important; }
       .controls-footer { height: 42px !important; margin-top: 4px !important; gap: 8px !important; }
-      button.custom-png-btn { width: 105px !important; height: 34px !important; font-size: 11px !important; }
+      button.custom-png-btn, .custom-select-ui { width: 105px !important; height: 34px !important; font-size: 11px !important; }
       .mute-btn-container button { width: 80px !important; height: 26px !important; }
     }
     .box { position: relative; width: 100%; flex: 1 1 0%; height: 0; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
@@ -38,7 +38,7 @@
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
-      opacity: 0.35;
+      opacity: 0.35; /* Initialized at 35% */
       pointer-events: none;
       z-index: 5;
       display: block;
@@ -47,7 +47,6 @@
     }
     .viewfinder-overlay.hidden { display: none !important; }
 
-    /* Safari Permission Fix: Ensure background image behaves exactly like a native video frame cover */
     #refVideo {
       background-image: url('https://res.cloudinary.com/dgz4sxuj5/video/upload/so_20/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.jpg');
       background-size: cover;
@@ -58,7 +57,6 @@
     video[poster] { object-fit: cover; }
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 2px; }
     #refLabel { background: rgba(46, 125, 50, 0.7); } 
-    
     #streamLabel { background: rgba(139, 0, 0, 0.7); } 
     #streamLabel.review-active { background: rgba(0, 0, 0, 0.7) !important; } 
     
@@ -68,14 +66,17 @@
     .zoom-container label { font-size: 10px; font-weight: bold; font-family: 'Marcellus', serif; min-width: 24px; text-align: center; color: #007aff; }
     .zoom-slider { -webkit-appearance: none; appearance: none; width: 100px; height: 4px; background: #444; border-radius: 2px; outline: none; }
     .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #007aff; cursor: pointer; }
+    
     .timeline-footer { width: 100%; height: 36px; display: none; align-items: center; gap: 12px; background: rgba(0,0,0,0.4); padding: 0 12px; box-sizing: border-box; border-radius: 8px; margin-top: 8px; flex-shrink: 0; }
     .timeline-footer.show { display: flex; }
     .timeline-slider { flex-grow: 1; -webkit-appearance: none; appearance: none; height: 6px; background: #333; border-radius: 3px; outline: none; }
     .timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #007aff; cursor: pointer; border: 2px solid white; }
     .time-display { font-family: 'Marcellus', serif; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
+    
     .mute-btn-container { display: flex; align-items: center; justify-content: center; }
     .mute-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; border: none; width: 90px; height: 32px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); background-color: #444; border-radius: 6px; background-image: url('images/audio-on.png'); }
     .mute-btn.is-muted { background-color: #ff453a; background-image: url('images/audio-muted.png'); }
+    
     .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
     button.custom-png-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: transparent; border: none; width: 130px; height: 44px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; transition: transform 0.1s ease, filter 0.2s; }
     button.custom-png-btn:active { transform: scale(0.96); filter: brightness(0.85); }
@@ -86,10 +87,29 @@
     #resetBtn { background-color: #8e8e93; border-radius: 8px; background-image: url('images/reset-btn.png'); }
     #resetBtn.danger-active { background-color: #ff3b30; background-image: url('images/clear-btn.png'); }
     
-    /* Configured Overlay button to elegant Light Grey layout */
     #overlayToggleBtn { background-color: #e5e5ea; color: #1c1c1e; border-radius: 8px; text-shadow: none; background-image: url('images/overlay-btn.png'); }
     #overlayToggleBtn.overlay-off { background-color: #444 !important; color: white !important; opacity: 0.7; }
     
+    /* Configured Droplist Dropdown styling to match layout styling profile */
+    .custom-select-ui {
+      font-family: 'Marcellus', serif;
+      width: 130px;
+      height: 44px;
+      background-color: #3a3a3c;
+      color: white;
+      border: 1px solid #48484a;
+      border-radius: 8px;
+      padding: 0 8px;
+      font-size: 12px;
+      font-weight: bold;
+      outline: none;
+      cursor: pointer;
+      display: block;
+      transition: opacity 0.2s ease, visibility 0.2s;
+    }
+    .custom-select-ui.hidden { display: none !important; }
+    .custom-select-ui:disabled { opacity: 0.4; cursor: not-allowed; }
+
     #downloadBtn { background-color: #34c759; border-radius: 8px; background-image: url('images/save-btn.png'); display: none; }
     .version-tag { color: #556; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: 'Marcellus', serif; position: absolute; right: 4px; }
     .countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: #fff; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
@@ -127,8 +147,21 @@
     <button id="actionBtn" class="custom-png-btn">Start Session</button>
     <button id="resetBtn" class="custom-png-btn" disabled>Reset / Clear</button>
     <button id="overlayToggleBtn" class="custom-png-btn">Overlay On</button>
+    <!-- Dropdown Selector immediately to the right of toggle overlay button -->
+    <select id="opacitySelector" class="custom-select-ui">
+      <option value="0.1">10% Opacity</option>
+      <option value="0.2">20% Opacity</option>
+      <option value="0.3" selected>30% Opacity</option>
+      <option value="0.4">40% Opacity</option>
+      <option value="0.5">50% Opacity</option>
+      <option value="0.6">60% Opacity</option>
+      <option value="0.7">70% Opacity</option>
+      <option value="0.8">80% Opacity</option>
+      <option value="0.9">90% Opacity</option>
+      <option value="1.0">100% Opacity</option>
+    </select>
     <button id="downloadBtn" class="custom-png-btn">Save</button>
-    <div class="version-tag">V24.1</div>
+    <div class="version-tag">V25.0</div>
   </div>
   <script>
     const refVideo = document.getElementById('refVideo');
@@ -136,6 +169,7 @@
     const cameraOverlay = document.getElementById('cameraOverlay');
     const actionBtn = document.getElementById('actionBtn');
     const overlayToggleBtn = document.getElementById('overlayToggleBtn');
+    const opacitySelector = document.getElementById('opacitySelector');
     const resetBtn = document.getElementById('resetBtn');
     const downloadBtn = document.getElementById('downloadBtn');
     const muteReviewBtn = document.getElementById('muteReviewBtn');
@@ -168,7 +202,10 @@
       if (!isReviewMode && !isRecordingMode) {
         refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
         refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing alignment framework (${PRE_RECORD_ALIGN_TIME}s)</span>`;
-        if (overlayActive) cameraOverlay.classList.remove('hidden');
+        if (overlayActive) {
+          cameraOverlay.classList.remove('hidden');
+          opacitySelector.classList.remove('hidden');
+        }
       }
     }
     
@@ -189,15 +226,22 @@
       resetZoomFadeTimer(); 
     });
 
+    // Handle Opacity Dropdown Updates
+    opacitySelector.addEventListener('change', (e) => {
+      cameraOverlay.style.opacity = e.target.value;
+    });
+
     overlayToggleBtn.addEventListener('click', () => {
       if (isReviewMode) return;
       overlayActive = !overlayActive;
       if (overlayActive) {
         cameraOverlay.classList.remove('hidden');
+        opacitySelector.classList.remove('hidden');
         overlayToggleBtn.innerText = "Overlay On";
         overlayToggleBtn.classList.remove('overlay-off');
       } else {
         cameraOverlay.classList.add('hidden');
+        opacitySelector.classList.add('hidden');
         overlayToggleBtn.innerText = "Overlay Off";
         overlayToggleBtn.classList.add('overlay-off');
       }
@@ -258,14 +302,18 @@
       streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
       
       overlayToggleBtn.disabled = false;
-      if (overlayActive) cameraOverlay.classList.remove('hidden');
+      opacitySelector.disabled = false;
+      if (overlayActive) {
+        cameraOverlay.classList.remove('hidden');
+        opacitySelector.classList.remove('hidden');
+      }
       
       actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
       resetBtn.innerText = "Reset / Clear"; resetBtn.className = "custom-png-btn"; resetBtn.disabled = true;
     });
     
     function runCountdown() {
-      actionBtn.disabled = true; overlayToggleBtn.disabled = true; resetBtn.disabled = true; downloadBtn.style.display = "none"; countdown.classList.add('show'); let count = 3; countdown.innerText = count; refVideo.currentTime = 0; refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
+      actionBtn.disabled = true; overlayToggleBtn.disabled = true; opacitySelector.disabled = true; resetBtn.disabled = true; downloadBtn.style.display = "none"; countdown.classList.add('show'); let count = 3; countdown.innerText = count; refVideo.currentTime = 0; refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
       const timer = setInterval(() => { count--; if (count > 0) { countdown.innerText = count; } else { clearInterval(timer); countdown.classList.remove('show'); startRecordingSession(); } }, 1000);
     }
     
@@ -282,7 +330,9 @@
         muteReviewBtn.classList.add('is-muted');
         
         cameraOverlay.classList.add('hidden');
+        opacitySelector.classList.add('hidden');
         overlayToggleBtn.disabled = true;
+        opacitySelector.disabled = true;
         
         viewfinder.setAttribute('playsinline', 'true'); viewfinder.setAttribute('webkit-playsinline', 'true'); viewfinder.style.transform = `scale(${chosenScale})`; zoomUi.style.display = "none";
         refLabel.innerHTML = `<span>REFERENCE LESSON</span>`; 
