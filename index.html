@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V25.0)</title>
+  <title>Sync Performance Review (V25.1)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -38,7 +38,7 @@
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
-      opacity: 0.35; /* Initialized at 35% */
+      opacity: 0.35;
       pointer-events: none;
       z-index: 5;
       display: block;
@@ -90,7 +90,6 @@
     #overlayToggleBtn { background-color: #e5e5ea; color: #1c1c1e; border-radius: 8px; text-shadow: none; background-image: url('images/overlay-btn.png'); }
     #overlayToggleBtn.overlay-off { background-color: #444 !important; color: white !important; opacity: 0.7; }
     
-    /* Configured Droplist Dropdown styling to match layout styling profile */
     .custom-select-ui {
       font-family: 'Marcellus', serif;
       width: 130px;
@@ -147,21 +146,21 @@
     <button id="actionBtn" class="custom-png-btn">Start Session</button>
     <button id="resetBtn" class="custom-png-btn" disabled>Reset / Clear</button>
     <button id="overlayToggleBtn" class="custom-png-btn">Overlay On</button>
-    <!-- Dropdown Selector immediately to the right of toggle overlay button -->
+    <!-- Streamlined Dropdown Selection Options -->
     <select id="opacitySelector" class="custom-select-ui">
-      <option value="0.1">10% Opacity</option>
-      <option value="0.2">20% Opacity</option>
-      <option value="0.3" selected>30% Opacity</option>
-      <option value="0.4">40% Opacity</option>
-      <option value="0.5">50% Opacity</option>
-      <option value="0.6">60% Opacity</option>
-      <option value="0.7">70% Opacity</option>
-      <option value="0.8">80% Opacity</option>
-      <option value="0.9">90% Opacity</option>
-      <option value="1.0">100% Opacity</option>
+      <option value="0.1">10%</option>
+      <option value="0.2">20%</option>
+      <option value="0.3" selected>30%</option>
+      <option value="0.4">40%</option>
+      <option value="0.5">50%</option>
+      <option value="0.6">60%</option>
+      <option value="0.7">70%</option>
+      <option value="0.8">80%</option>
+      <option value="0.9">90%</option>
+      <option value="1.0">100%</option>
     </select>
     <button id="downloadBtn" class="custom-png-btn">Save</button>
-    <div class="version-tag">V25.0</div>
+    <div class="version-tag">V25.1</div>
   </div>
   <script>
     const refVideo = document.getElementById('refVideo');
@@ -226,7 +225,6 @@
       resetZoomFadeTimer(); 
     });
 
-    // Handle Opacity Dropdown Updates
     opacitySelector.addEventListener('change', (e) => {
       cameraOverlay.style.opacity = e.target.value;
     });
