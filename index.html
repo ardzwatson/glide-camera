@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V23.6)</title>
+  <title>Sync Performance Review (V24.0)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -22,14 +22,31 @@
       .rec-indicator { right: 6px !important; left: auto !important; }
       .zoom-container { bottom: 6px !important; padding: 4px 8px !important; }
       .timeline-footer { height: 28px !important; margin-top: 4px !important; gap: 8px !important; }
-      .controls-footer { height: 42px !important; margin-top: 4px !important; }
-      button.custom-png-btn { width: 110px !important; height: 34px !important; }
+      .controls-footer { height: 42px !important; margin-top: 4px !important; gap: 8px !important; }
+      button.custom-png-btn { width: 105px !important; height: 34px !important; font-size: 11px !important; }
       .mute-btn-container button { width: 80px !important; height: 26px !important; }
     }
     .box { position: relative; width: 100%; flex: 1 1 0%; height: 0; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
     .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; background: #000; transition: transform 0.1s ease-out; transform-origin: center center; }
     
+    /* Live Cam Ghost Overlay Styles */
+    .viewfinder-overlay {
+      position: absolute;
+      inset: 0;
+      background-image: url('https://res.cloudinary.com/dgz4sxuj5/video/upload/so_20/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0.35;
+      pointer-events: none;
+      z-index: 5;
+      display: block; /* Managed via JS classes */
+      transition: opacity 0.2s ease, transform 0.1s ease-out;
+      transform-origin: center center;
+    }
+    .viewfinder-overlay.hidden { display: none !important; }
+
     /* Safari Permission Fix: Ensure background image behaves exactly like a native video frame cover */
     #refVideo {
       background-image: url('https://res.cloudinary.com/dgz4sxuj5/video/upload/so_20/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.jpg');
@@ -42,9 +59,8 @@
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 2px; }
     #refLabel { background: rgba(46, 125, 50, 0.7); } 
     
-    /* Updated background colors for Live Cam vs Recorded Review */
-    #streamLabel { background: rgba(139, 0, 0, 0.7); } /* Dark Red for Live Cam */
-    #streamLabel.review-active { background: rgba(0, 0, 0, 0.7) !important; } /* Solid Black with opacity for Review */
+    #streamLabel { background: rgba(139, 0, 0, 0.7); } 
+    #streamLabel.review-active { background: rgba(0, 0, 0, 0.7) !important; } 
     
     .zoom-note { font-size: 8px; color: #aaa; font-weight: normal; }
     .zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); opacity: 1; transition: opacity 0.3s ease; }
@@ -61,11 +77,14 @@
     .mute-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; border: none; width: 90px; height: 32px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); background-color: #444; border-radius: 6px; background-image: url('images/audio-on.png'); }
     .mute-btn.is-muted { background-color: #ff453a; background-image: url('images/audio-muted.png'); }
     .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
-    button.custom-png-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: transparent; border: none; width: 140px; height: 44px; cursor: pointer; font-size: 13px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; transition: transform 0.1s ease, filter 0.2s; }
+    button.custom-png-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: transparent; border: none; width: 130px; height: 44px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; transition: transform 0.1s ease, filter 0.2s; }
     button.custom-png-btn:active { transform: scale(0.96); filter: brightness(0.85); }
     button.custom-png-btn:disabled { filter: grayscale(1) opacity(0.4); cursor: not-allowed; transform: none; }
+    
     #actionBtn { background-color: #007aff; border-radius: 8px; background-image: url('images/start-btn.png'); }
     #actionBtn.btn-recording { background-color: #ff453a !important; background-image: url('images/stop-btn.png') !important; }
+    #overlayToggleBtn { background-color: #5856d6; border-radius: 8px; background-image: url('images/overlay-btn.png'); }
+    #overlayToggleBtn.overlay-off { background-color: #444 !important; opacity: 0.7; }
     #resetBtn { background-color: #8e8e93; border-radius: 8px; background-image: url('images/reset-btn.png'); }
     #resetBtn.danger-active { background-color: #ff3b30; background-image: url('images/clear-btn.png'); }
     #downloadBtn { background-color: #34c759; border-radius: 8px; background-image: url('images/save-btn.png'); display: none; }
@@ -89,7 +108,11 @@
     <div class="box" id="cameraBox">
       <div class="label" id="streamLabel"><span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span></div>
       <div class="rec-indicator" id="recBadge">● RECORDING</div>
-      <div class="viewfinder-container"><video id="viewfinder" autoplay playsinline webkit-playsinline muted></video></div>
+      <div class="viewfinder-container">
+        <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
+        <!-- Transparent thumbnail layer alignment mask -->
+        <div id="cameraOverlay" class="viewfinder-overlay"></div>
+      </div>
       <div class="zoom-container" id="zoomUi"><input type="range" id="zoomSlider" class="zoom-slider" min="1" max="2" step="0.1" value="1"><label id="zoomLabel">1.0x</label></div>
     </div>
   </div>
@@ -100,14 +123,17 @@
   </div>
   <div class="controls-footer">
     <button id="actionBtn" class="custom-png-btn">Start Session</button>
+    <button id="overlayToggleBtn" class="custom-png-btn">Overlay On</button>
     <button id="resetBtn" class="custom-png-btn" disabled>Reset / Clear</button>
     <button id="downloadBtn" class="custom-png-btn">Save</button>
-    <div class="version-tag">V23.6</div>
+    <div class="version-tag">V24.0</div>
   </div>
   <script>
     const refVideo = document.getElementById('refVideo');
     const viewfinder = document.getElementById('viewfinder');
+    const cameraOverlay = document.getElementById('cameraOverlay');
     const actionBtn = document.getElementById('actionBtn');
+    const overlayToggleBtn = document.getElementById('overlayToggleBtn');
     const resetBtn = document.getElementById('resetBtn');
     const downloadBtn = document.getElementById('downloadBtn');
     const muteReviewBtn = document.getElementById('muteReviewBtn');
@@ -124,6 +150,7 @@
     const timeLabel = document.getElementById('timeLabel');
 
     let mediaRecorder = null, recordedChunks = [], liveStream = null, isRecordingMode = false, isReviewMode = false, loopInterval = null, isUserScrubbing = false, zoomFadeTimeout = null, chosenScale = 1, currentVideoBlob = null, isSeeking = false;
+    let overlayActive = true; 
     const PRE_RECORD_ALIGN_TIME = 20;
 
     async function initCamera() {
@@ -139,6 +166,7 @@
       if (!isReviewMode && !isRecordingMode) {
         refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
         refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing alignment framework (${PRE_RECORD_ALIGN_TIME}s)</span>`;
+        if (overlayActive) cameraOverlay.classList.remove('hidden');
       }
     }
     
@@ -150,7 +178,30 @@
     }
     cameraBox.addEventListener('mousemove', resetZoomFadeTimer);
     cameraBox.addEventListener('touchstart', resetZoomFadeTimer);
-    zoomSlider.addEventListener('input', (e) => { chosenScale = parseFloat(e.target.value); zoomLabel.innerText = `${chosenScale.toFixed(1)}x`; viewfinder.style.transform = `scale(${chosenScale})`; resetZoomFadeTimer(); });
+    
+    zoomSlider.addEventListener('input', (e) => { 
+      chosenScale = parseFloat(e.target.value); 
+      zoomLabel.innerText = `${chosenScale.toFixed(1)}x`; 
+      viewfinder.style.transform = `scale(${chosenScale})`; 
+      cameraOverlay.style.transform = `scale(${chosenScale})`; 
+      resetZoomFadeTimer(); 
+    });
+
+    // Control structural UI visibility state of transparency mask manually
+    overlayToggleBtn.addEventListener('click', () => {
+      if (isReviewMode) return; // Feature locked to capture frame only
+      overlayActive = !overlayActive;
+      if (overlayActive) {
+        cameraOverlay.classList.remove('hidden');
+        overlayToggleBtn.innerText = "Overlay On";
+        overlayToggleBtn.classList.remove('overlay-off');
+      } else {
+        cameraOverlay.classList.add('hidden');
+        overlayToggleBtn.innerText = "Overlay Off";
+        overlayToggleBtn.classList.add('overlay-off');
+      }
+    });
+
     actionBtn.addEventListener('click', () => { if (!isRecordingMode && !isReviewMode) { runCountdown(); } else if (isRecordingMode) { stopRecordingEarly(); } else if (isReviewMode) { if (refVideo.paused) { playBoth(); } else { pauseBoth(); } } });
     function playBoth() { viewfinder.play(); refVideo.play(); actionBtn.innerText = "Pause Review"; }
     function shadowPause() { viewfinder.pause(); refVideo.pause(); }
@@ -195,21 +246,25 @@
       if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
       viewfinder.srcObject = null; viewfinder.src = ""; viewfinder.srcObject = liveStream; 
       
-      // Reset default muted state variables
       viewfinder.muted = true;
       muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
       
       masterTimeline.classList.remove('show'); downloadBtn.style.display = "none";
-      zoomSlider.value = 1; zoomLabel.innerText = "1.0x"; viewfinder.style.transform = "scale(1)"; zoomUi.style.display = "flex"; resetZoomFadeTimer();
+      zoomSlider.value = 1; zoomLabel.innerText = "1.0x"; viewfinder.style.transform = "scale(1)"; cameraOverlay.style.transform = "scale(1)";
+      zoomUi.style.display = "flex"; resetZoomFadeTimer();
       recBadge.style.display = "none"; 
       streamLabel.classList.remove('review-active');
       streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
+      
+      overlayToggleBtn.disabled = false;
+      if (overlayActive) cameraOverlay.classList.remove('hidden');
+      
       actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
       resetBtn.innerText = "Reset / Clear"; resetBtn.className = "custom-png-btn"; resetBtn.disabled = true;
     });
     
     function runCountdown() {
-      actionBtn.disabled = true; resetBtn.disabled = true; downloadBtn.style.display = "none"; countdown.classList.add('show'); let count = 3; countdown.innerText = count; refVideo.currentTime = 0; refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
+      actionBtn.disabled = true; overlayToggleBtn.disabled = true; resetBtn.disabled = true; downloadBtn.style.display = "none"; countdown.classList.add('show'); let count = 3; countdown.innerText = count; refVideo.currentTime = 0; refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
       const timer = setInterval(() => { count--; if (count > 0) { countdown.innerText = count; } else { clearInterval(timer); countdown.classList.remove('show'); startRecordingSession(); } }, 1000);
     }
     
@@ -221,10 +276,13 @@
         isRecordingMode = false; recBadge.style.display = "none"; clearTimeout(zoomFadeTimeout); if (recordedChunks.length === 0) return;
         currentVideoBlob = new Blob(recordedChunks, { type: 'video/mp4' }); viewfinder.srcObject = null; viewfinder.src = URL.createObjectURL(currentVideoBlob); 
         
-        // Mute recorded player by default for review mode execution
         viewfinder.muted = true;
         muteReviewBtn.innerText = "Muted";
         muteReviewBtn.classList.add('is-muted');
+        
+        // Make absolutely sure overlay frame hides during actual review playback
+        cameraOverlay.classList.add('hidden');
+        overlayToggleBtn.disabled = true;
         
         viewfinder.setAttribute('playsinline', 'true'); viewfinder.setAttribute('webkit-playsinline', 'true'); viewfinder.style.transform = `scale(${chosenScale})`; zoomUi.style.display = "none";
         refLabel.innerHTML = `<span>REFERENCE LESSON</span>`; 
@@ -283,7 +341,6 @@
       }, 50); 
     }
     
-    // Set initial mute UI state properly on load
     muteReviewBtn.classList.add('is-muted');
     
     window.addEventListener('load', initCamera);
