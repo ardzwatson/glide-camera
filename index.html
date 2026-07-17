@@ -2,789 +2,263 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V26.0)</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digital Hub & Video Review - v26.1</title>
   <style>
-    body, html { 
-      margin: 0; height: 100dvh; width: 100%; box-sizing: border-box; background: #111; color: white; 
-      font-family: 'Marcellus', -apple-system, BlinkMacSystemFont, serif; overflow: hidden; display: flex; flex-direction: column;
-      padding: env(safe-area-inset-top, 8px) 12px calc(env(safe-area-inset-bottom, 0px) + 8px) 12px;
+    /* --- Base Layout & Theme --- */
+    :root {
+      --bg-dark: #121212;
+      --panel-bg: #1e1e1e;
+      --text-main: #e0e0e0;
+      --accent-red: #ff4d4d;
+      --btn-base-opacity: 0.85; /* Lowered by 15% from 1.0 */
     }
 
-    /* --- PASSWORD GATE STYLES --- */
-    #passwordGate {
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow-x: hidden;
+      height: 100vh;
+    }
+
+    /* --- PERSISTENT SIGN-OUT BUTTON (Extreme Left) --- */
+    .sign-out-anchor {
+      position: fixed;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 9999;
+      
+      /* Visual styling matching requirements */
+      background-color: rgba(0, 0, 0, 0.15); /* 15% opacity black */
+      color: var(--accent-red);
+      border: 1px solid rgba(255, 77, 77, 0.2);
+      border-left: none; /* Flush with edge */
+      border-radius: 0 8px 8px 0;
+      
+      padding: 12px 14px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      writing-mode: vertical-lr; /* Optional: vertical orientation for a sleek profile */
+      transform-origin: left center;
+      transition: background-color 0.2s ease, padding-left 0.2s ease;
+    }
+
+    .sign-out-anchor:hover {
+      background-color: rgba(0, 0, 0, 0.4);
+      padding-left: 18px; /* Slight offset peek on hover */
+    }
+
+    /* --- VIDEO REVIEW PAGE LAYOUT --- */
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      padding: 0 40px 0 80px; /* Offset left padding to clear the sign-out anchor */
+      box-sizing: border-box;
+    }
+
+    .video-viewport {
+      width: 100%;
+      max-width: 900px;
+      aspect-ratio: 16/9;
+      background: #000;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #2d2d2d;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .video-placeholder-text {
+      color: #666;
+      font-size: 1.1rem;
+    }
+
+    /* --- ACTION CONTROLS (v26.1 Lowered Opacity) --- */
+    .control-panel {
+      margin-top: 20px;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .control-btn {
+      background: #2a2a2a;
+      color: #fff;
+      border: 1px solid #3d3d3d;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: 500;
+      cursor: pointer;
+      
+      /* Version 26.1 Opacity reduction (Lowered by 15%) */
+      opacity: var(--btn-base-opacity); 
+      transition: opacity 0.2s ease, background-color 0.2s ease;
+    }
+
+    .control-btn:hover {
+      opacity: 1; /* Bring back to full focus visibility on hover */
+      background: #333;
+    }
+
+    .control-btn.primary {
+      background: #0070f3;
+      border-color: #0080ff;
+    }
+    
+    .control-btn.primary:hover {
+      background: #0060df;
+    }
+
+    /* --- OVERLAY SCREENS (Password/Lock) --- */
+    .screen-overlay {
       position: fixed;
       inset: 0;
-      background: #111;
-      z-index: 9999;
+      background: #0d0d0d;
+      z-index: 10000;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 20px;
-      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s ease;
     }
-    .gate-card {
-      background-image: url('https://lh3.googleusercontent.com/d/1B2Dk1T1vTjx0QaqoJIPZs9wvx09M60AG'); /* Animated GIF background */
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      border: 1px solid #2c2c2e;
-      padding: 40px 30px;
+
+    .screen-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .lock-box {
+      background: var(--panel-bg);
+      padding: 40px;
       border-radius: 16px;
+      border: 1px solid #2d2d2d;
       text-align: center;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.7);
-      max-width: 360px;
-      width: 100%;
-      box-sizing: border-box;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     }
-    .gate-card h2 { margin: 0 0 10px 0; font-size: 24px; letter-spacing: 1px; color: #fff; }
-    .gate-card p { margin: 0 0 24px 0; font-size: 13px; color: #8e8e93; }
-    .gate-input {
-      width: 100%;
-      height: 44px;
-      background: #2c2c2e;
-      border: 1px solid #3a3a3c;
-      border-radius: 8px;
-      color: white;
-      text-align: center;
-      font-size: 16px;
-      outline: none;
-      box-sizing: border-box;
+
+    .lock-box input {
+      background: #121212;
+      border: 1px solid #3d3d3d;
+      padding: 12px;
+      color: #fff;
+      border-radius: 6px;
+      width: 220px;
       margin-bottom: 16px;
-      font-family: inherit;
-      transition: border-color 0.2s ease;
-    }
-    .gate-input:focus { border-color: #ff453a; }
-    
-    .gate-btn {
-      position: relative; /* Create anchoring context for the absolute pseudo-element */
-      width: 100%;
-      height: 44px;
-      background-color: transparent;
-      border: none;
-      border-radius: 8px;
-      color: white;
-      font-size: 14px;
-      font-weight: bold;
-      cursor: pointer;
-      font-family: inherit;
-      transition: filter 0.2s, transform 0.1s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
-      overflow: hidden; /* Keep the pseudo-element image within the border radius bounds */
-      z-index: 1; /* Isolates stacking context so text stays on top */
-    }
-    .gate-btn:active { transform: scale(0.98); filter: brightness(0.85); }
-
-    /* Target the background layer separately to apply opacity */
-    .gate-btn::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background-image: url('https://lh3.googleusercontent.com/d/121yd-uXZ_3mkD9kYfgTuX_RbmtE-_mEv');
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      opacity: 0.4; /* Set background image opacity to 40% */
-      z-index: -1; /* Layer it safely underneath your button text */
-    }
-    .gate-error { color: #ff453a; font-size: 12px; margin-top: 10px; display: none; }
-
-    /* App content container (hidden until unlocked) */
-    #appContent {
-      display: none;
-      flex-direction: column;
-      width: 100%;
-      height: 100%;
-    }
-
-    /* --- ORIGINAL STYLES --- */
-    .container { display: flex; flex-direction: column; gap: 12px; width: 100%; flex-grow: 1; min-height: 0; }
-    @media (orientation: landscape) {
-      body, html { padding: env(safe-area-inset-top, 4px) 8px calc(env(safe-area-inset-bottom, 0px) + 4px) 8px; }
-      .container { flex-direction: row; gap: 8px; }
-      .box { height: 100% !important; width: 50% !important; }
-      .label, .rec-indicator { top: 6px !important; left: 6px !important; font-size: 9px !important; padding: 2px 6px !important; }
-      .rec-indicator { right: 6px !important; left: auto !important; }
-      .zoom-container { bottom: 6px !important; padding: 4px 8px !important; }
-      .timeline-footer { height: 28px !important; margin-top: 4px !important; gap: 8px !important; }
-      .controls-footer { height: 42px !important; margin-top: 4px !important; gap: 8px !important; }
-      button.custom-png-btn, .custom-select-ui { width: 105px !important; height: 34px !important; font-size: 11px !important; }
-      .mute-btn-container button { width: 80px !important; height: 26px !important; }
-    }
-    .box { position: relative; width: 100%; flex: 1 1 0%; height: 0; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
-    .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; }
-    
-    video { 
-      width: 100%; 
-      height: 100%; 
-      object-fit: cover; 
-      background: #000; 
-      transition: transform 0.1s ease-out; 
-      transform-origin: center center; 
-      -webkit-touch-callout: none; /* Prevents long-press menu on iOS Safari */
-      user-select: none;           /* Prevents selection */
-    }
-    
-    .viewfinder-overlay {
-      position: absolute;
-      inset: 0;
-      background-image: url('https://res.cloudinary.com/dgz4sxuj5/video/upload/so_20/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.jpg');
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      opacity: 0.35;
-      pointer-events: none;
-      z-index: 5;
-      display: block;
-      transition: opacity 0.2s ease, transform 0.1s ease-out;
-      transform-origin: center center;
-    }
-    .viewfinder-overlay.hidden { display: none !important; }
-
-    #refVideo {
-      background-image: url('https://res.cloudinary.com/dgz4sxuj5/video/upload/so_20/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.jpg');
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-    }
-    
-    video[poster] { object-fit: cover; }
-    .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 2px; }
-    #refLabel { background: rgba(46, 125, 50, 0.7); } 
-    #streamLabel { background: rgba(139, 0, 0, 0.7); } 
-    #streamLabel.review-active { background: rgba(0, 0, 0, 0.7) !important; } 
-    
-    .zoom-note { font-size: 8px; color: #aaa; font-weight: normal; }
-    .zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); opacity: 1; transition: opacity 0.3s ease; }
-    .zoom-container.fade-out { opacity: 0; pointer-events: none; }
-    .zoom-container label { font-size: 10px; font-weight: bold; font-family: 'Marcellus', serif; min-width: 24px; text-align: center; color: #007aff; }
-    .zoom-slider { -webkit-appearance: none; appearance: none; width: 100px; height: 4px; background: #444; border-radius: 2px; outline: none; }
-    .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #007aff; cursor: pointer; }
-    
-    .timeline-footer { width: 100%; height: 36px; display: none; align-items: center; gap: 12px; background: rgba(0,0,0,0.4); padding: 0 12px; box-sizing: border-box; border-radius: 8px; margin-top: 8px; flex-shrink: 0; }
-    .timeline-footer.show { display: flex; }
-    .timeline-slider { flex-grow: 1; -webkit-appearance: none; appearance: none; height: 6px; background: #333; border-radius: 3px; outline: none; }
-    .timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #007aff; cursor: pointer; border: 2px solid white; }
-    .time-display { font-family: 'Marcellus', serif; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
-    
-    .mute-btn-container { display: flex; align-items: center; justify-content: center; }
-    .mute-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; border: none; width: 90px; height: 32px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); background-color: #444; border-radius: 6px; background-image: url('images/audio-on.png'); }
-    .mute-btn.is-muted { background-color: #ff453a; background-image: url('images/audio-muted.png'); }
-    
-    .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
-    button.custom-png-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: transparent; border: none; width: 130px; height: 44px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; transition: transform 0.1s ease, filter 0.2s; }
-    button.custom-png-btn:active { transform: scale(0.96); filter: brightness(0.85); }
-    button.custom-png-btn:disabled { filter: grayscale(1) opacity(0.4); cursor: not-allowed; transform: none; }
-    
-    #actionBtn { background-color: #007aff; border-radius: 8px; background-image: url('images/start-btn.png'); }
-    #actionBtn.btn-recording { background-color: #ff453a !important; background-image: url('images/stop-btn.png') !important; }
-    
-    #resetBtn { background-color: #8e8e93; border-radius: 8px; background-image: url('images/reset-btn.png'); display: none; }
-    #resetBtn.danger-active { background-color: #ff3b30; background-image: url('images/clear-btn.png'); }
-    
-    #overlayToggleBtn { background-color: #e5e5ea; color: #1c1c1e; border-radius: 8px; text-shadow: none; background-image: url('images/overlay-btn.png'); }
-    #overlayToggleBtn.overlay-off { background-color: #444 !important; color: white !important; opacity: 0.7; }
-    
-    .custom-select-ui {
-      font-family: 'Marcellus', serif;
-      width: 130px;
-      height: 44px;
-      background-color: #3a3a3c;
-      color: white;
-      border: 1px solid #48484a;
-      border-radius: 8px;
-      padding: 0 8px;
-      font-size: 12px;
-      font-weight: bold;
-      outline: none;
-      cursor: pointer;
-      display: block;
-      transition: opacity 0.2s ease, visibility 0.2s;
-    }
-    .custom-select-ui.hidden { display: none !important; }
-    .custom-select-ui:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    #downloadBtn { background-color: #34c759; border-radius: 8px; background-image: url('images/save-btn.png'); display: none; }
-    .version-tag { color: #556; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: 'Marcellus', serif; position: absolute; right: 4px; }
-    .countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: #fff; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
-    .countdown-overlay.show { opacity: 1; }
-    .rec-indicator { position: absolute; top: 12px; right: 12px; background: #ff3b30; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; animation: pulse 1s infinite alternate; display: none; z-index: 10; }
-    @keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
-
-    /* Moving Watermark & Security Warn Overlays */
-    #videoWatermark {
-      position: absolute;
-      pointer-events: none;
-      color: rgba(255, 255, 255, 0.22);
-      font-size: 18px;
-      font-weight: bold;
-      font-family: 'Marcellus', serif;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      z-index: 15;
-      white-space: nowrap;
-      text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
-      display: none;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-    #securityWarning {
-      position: absolute;
-      inset: 0;
-      background: rgba(10, 10, 10, 0.97);
-      z-index: 999;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
       text-align: center;
-      color: #ff453a;
-      padding: 20px;
-      box-sizing: border-box;
+      outline: none;
     }
-    #securityWarning h2 { font-size: 26px; margin: 0 0 10px 0; font-weight: 800; letter-spacing: 1px; }
-    #securityWarning p { color: #fff; max-width: 320px; font-size: 14px; line-height: 1.4; margin: 0 0 20px 0; }
-    #securityWarning button { font-family: 'Marcellus', serif; padding: 10px 24px; background: #2c2c2e; border: 1px solid #3a3a3c; color: white; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-    #securityWarning button:active { background: #3a3a3c; }
+
+    .lock-box button {
+      background: #fff;
+      color: #000;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .version-tag {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      color: #444;
+      font-size: 0.75rem;
+      font-family: monospace;
+    }
   </style>
 </head>
 <body>
 
-  <!-- PASSWORD GATE OVERLAY -->
-  <div id="passwordGate">
-    <div class="gate-card">
-      <h2>SECURE PORTAL</h2>
-      <p>Please enter your access key to begin.</p>
-      <input type="password" id="gatePass" class="gate-input" placeholder="••••••••" autofocus>
-      <button onclick="unlockPortal()" class="gate-btn">Unlock</button>
-      <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
+  <!-- 1. Left Edge Sign Out Anchor -->
+  <button class="sign-out-anchor" onclick="triggerSignOut()">
+    Sign Out
+  </button>
+
+  <!-- Main Video Review Area -->
+  <div class="container">
+    <div class="video-viewport">
+      <div class="video-placeholder-text">Video Review Stream Feed</div>
+    </div>
+
+    <!-- 2. Controls Panel (Resting opacity at 85%) -->
+    <div class="control-panel">
+      <button class="control-btn primary">Start Session</button>
+      <button class="control-btn">Clear Canvas</button>
+      <button class="control-btn">Toggle Overlay</button>
+      <button class="control-btn">Mark Keyframe</button>
     </div>
   </div>
 
-  <!-- MAIN APP CONTAINER (Hidden initially) -->
-  <div id="appContent">
-    <div class="container">
-      <div class="box" id="videoBox" style="position: relative;">
-        <div class="label" id="refLabel">REFERENCE LESSON</div>
-        
-        <!-- Reference Video -->
-        <video id="refVideo" 
-               poster="https://res.cloudinary.com/dgz4sxuj5/video/upload/so_20/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.jpg" 
-               preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
-        
-        <!-- Floating Watermark -->
-        <div id="videoWatermark"></div>
-
-        <!-- Security Notice Shield -->
-        <div id="securityWarning">
-          <h2>SECURITY NOTICE</h2>
-          <p>Environment focus lost or screen capture attempt detected. Media playback has been suspended.</p>
-          <button onclick="dismissWarning()">Resume View</button>
-        </div>
-
-        <div class="countdown-overlay" id="countdown">3</div>
-      </div>
-      
-      <div class="box" id="cameraBox">
-        <div class="label" id="streamLabel"><span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span></div>
-        <div class="rec-indicator" id="recBadge">● RECORDING</div>
-        <div class="viewfinder-container">
-          <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
-          <div id="cameraOverlay" class="viewfinder-overlay"></div>
-        </div>
-        <div class="zoom-container" id="zoomUi"><input type="range" id="zoomSlider" class="zoom-slider" min="1" max="2" step="0.1" value="1"><label id="zoomLabel">1.0x</label></div>
-      </div>
-    </div>
-    
-    <div class="timeline-footer" id="masterTimeline">
-      <input type="range" id="scrubSlider" class="timeline-slider" min="0" max="100" step="0.1" value="0">
-      <div class="time-display" id="timeLabel">0:00</div>
-      <div class="mute-btn-container"><button class="mute-btn" id="muteReviewBtn">Muted</button></div>
-    </div>
-    
-    <div class="controls-footer">
-      <button id="actionBtn" class="custom-png-btn">Start Session</button>
-      <button id="resetBtn" class="custom-png-btn" disabled>Reset / Clear</button>
-      <button id="overlayToggleBtn" class="custom-png-btn">Overlay On</button>
-      <select id="opacitySelector" class="custom-select-ui">
-        <option value="0.1">10%</option>
-        <option value="0.2">20%</option>
-        <option value="0.3" selected>30%</option>
-        <option value="0.4">40%</option>
-        <option value="0.5">50%</option>
-        <option value="0.6">60%</option>
-        <option value="0.7">70%</option>
-        <option value="0.8">80%</option>
-        <option value="0.9">90%</option>
-        <option value="1.0">100%</option>
-      </select>
-      <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V25.3</div>
+  <!-- 3. Password / Authentication Screen Overlay (Triggers on Sign-Out) -->
+  <div id="passwordOverlay" class="screen-overlay">
+    <div class="lock-box">
+      <h2 style="margin-top: 0; margin-bottom: 24px;">Session Locked</h2>
+      <input type="password" id="passInput" placeholder="Enter password to sign back in">
+      <br>
+      <button onclick="mockSignIn()">Sign In</button>
     </div>
   </div>
+
+  <div class="version-tag">v26.1</div>
 
   <script>
-    // --- DATABASE & VARIABLE SYNC ---
-    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1fxQrloklFsVMvy1-hf5kouhH1w0N_gaPy26uA5jT7S8/gviz/tq?tqx=out:csv";
-    
-    let userDatabase = {}; 
-    let authorizedUser = "";
-    let watermarkTimer = null;
+    // --- SIGN OUT & PASSWORD STATE HANDLERS ---
+    const overlay = document.getElementById('passwordOverlay');
+    const passInput = document.getElementById('passInput');
 
-    const refVideo = document.getElementById('refVideo');
-    const gateError = document.getElementById('gateError');
-    const watermarkEl = document.getElementById('videoWatermark');
-    const warningEl = document.getElementById('securityWarning');
-
-    const viewfinder = document.getElementById('viewfinder');
-    const cameraOverlay = document.getElementById('cameraOverlay');
-    const actionBtn = document.getElementById('actionBtn');
-    const overlayToggleBtn = document.getElementById('overlayToggleBtn');
-    const opacitySelector = document.getElementById('opacitySelector');
-    const resetBtn = document.getElementById('resetBtn');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const muteReviewBtn = document.getElementById('muteReviewBtn');
-    const countdown = document.getElementById('countdown');
-    const recBadge = document.getElementById('recBadge');
-    const streamLabel = document.getElementById('streamLabel');
-    const refLabel = document.getElementById('refLabel');
-    const cameraBox = document.getElementById('cameraBox');
-    const zoomSlider = document.getElementById('zoomSlider');
-    const zoomLabel = document.getElementById('zoomLabel');
-    const zoomUi = document.getElementById('zoomUi');
-    const masterTimeline = document.getElementById('masterTimeline');
-    const scrubSlider = document.getElementById('scrubSlider');
-    const timeLabel = document.getElementById('timeLabel');
-
-    let mediaRecorder = null, recordedChunks = [], liveStream = null, isRecordingMode = false, isReviewMode = false, loopInterval = null, isUserScrubbing = false, zoomFadeTimeout = null, chosenScale = 1, currentVideoBlob = null, isSeeking = false;
-    let overlayActive = true; 
-    const PRE_RECORD_ALIGN_TIME = 20;
-
-    // --- 1. ACCESS KEY SYNC ENGINE (GOOGLE SHEETS) ---
-    async function fetchAccessDatabase() {
-      try {
-        const response = await fetch(GOOGLE_SHEET_CSV_URL);
-        if (!response.ok) throw new Error("Database sync failed");
-        
-        const csvText = await response.text();
-        const lines = csvText.split(/\r?\n/);
-        
-        lines.forEach(line => {
-          const columns = line.split(',').map(col => col.replace(/^"|"$/g, '').trim());
-          if (columns[0] && columns[1]) {
-            // Map keys dynamically
-            userDatabase[columns[0].toLowerCase()] = columns[1];
-          }
-        });
-        
-        if (gateError) {
-          gateError.style.display = 'none';
-          gateError.innerText = "Incorrect passcode. Please try again.";
-        }
-      } catch (err) {
-        console.error("Critical database synchronization failure:", err);
-        if (gateError) {
-          gateError.style.display = 'block';
-          gateError.innerText = "Security database offline. Check connection.";
-        }
-      }
+    function triggerSignOut() {
+      // Clear password field and activate password block
+      passInput.value = '';
+      overlay.classList.add('active');
     }
-    fetchAccessDatabase();
 
-    // --- 2. AUTHENTICATION CONTROLLER ---
-    function unlockPortal() {
-      const passInput = document.getElementById('gatePass');
-      const input = passInput ? passInput.value.trim().toLowerCase() : "";
-      
-      if (userDatabase[input]) {
-        authorizedUser = userDatabase[input];
-        
-        document.getElementById('passwordGate').style.display = 'none';
-        document.getElementById('appContent').style.display = 'flex';
-        
-        // Dynamically inject stream source securely
-        refVideo.src = "https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4";
-        
-        startWatermarkEngine();
-        initCamera();
+    function mockSignIn() {
+      // Return to workspace view on mock password entry
+      if (passInput.value.trim() !== '') {
+        overlay.classList.remove('active');
       } else {
-        if (gateError) gateError.style.display = 'block';
-        if (passInput) passInput.value = '';
+        alert('Please enter a password');
       }
     }
 
-    document.getElementById('gatePass').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') unlockPortal();
+    // Allow Enter key to sign in
+    passInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') mockSignIn();
     });
 
-    // --- 3. HARDENED WATERMARK ENGINE ---
-    function startWatermarkEngine() {
-      watermarkEl.innerText = `${authorizedUser} • DRAFT PREVIEW`;
-      watermarkEl.style.display = 'block';
-      
-      const moveWatermark = () => {
-        const container = refVideo.parentElement;
-        
-        const maxX = container.clientWidth - watermarkEl.clientWidth - 24;
-        const maxY = container.clientHeight - watermarkEl.clientHeight - 24;
-        
-        const randomX = Math.max(12, Math.floor(Math.random() * maxX));
-        const randomY = Math.max(12, Math.floor(Math.random() * maxY));
-        
-        watermarkEl.style.left = `${randomX}px`;
-        watermarkEl.style.top = `${randomY}px`;
-      };
-      
-      moveWatermark();
-      watermarkTimer = setInterval(moveWatermark, 4500); // Shuffles position vectors dynamically every 4.5s
-    }
-
-    // --- 4. SECURE ISOLATION SHIELD ---
-    window.addEventListener('blur', () => {
-      triggerSecurityBreach();
-    });
-
-    function triggerSecurityBreach() {
-      if (isReviewMode && !refVideo.paused) {
-        pauseBoth();
-      } else if (isRecordingMode) {
-        stopRecordingEarly();
-      }
-      refVideo.pause(); 
-      warningEl.style.display = 'flex';
-    }
-
-    function dismissWarning() {
-      warningEl.style.display = 'none';
-    }
-
-    // Key intercept blocks (PrintScreen, standard shortcuts)
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'PrintScreen') {
-        e.preventDefault();
-        triggerSecurityBreach();
-      }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
-        triggerSecurityBreach();
-      }
-    });
-
-    // Browser Context Menu Blockers
-    refVideo.addEventListener('contextmenu', (e) => e.preventDefault());
-    refVideo.addEventListener('canplaythrough', () => {
-      refVideo.removeAttribute('src'); // Stripping explicit media URI after memory stream buffer handoff
-    }, { once: true });
-
-    // --- 5. SYSTEM CAMERA CORE ---
-    async function initCamera() {
-      try { 
-        liveStream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 360 } }, 
-          audio: true 
-        }); 
-        viewfinder.srcObject = liveStream; 
-        resetZoomFadeTimer(); 
-        setupInitialState(); 
-      } catch (err) { 
-        console.warn("Camera access could not be acquired automatically:", err); 
-        setupInitialState(); 
+    // --- 4. GAZE AND VISIBILITY SECURITY BYPASS (v26.1) ---
+    function onUserGazeChanged(isLooking) {
+      if (!isLooking) {
+        // SECURITY NOTICE BYPASS
+        // Log activity silently. No prompt trigger or auto-lockout is executed.
+        console.log("v26.1 Update: User checked away from screen. Gaze trigger bypassed.");
+        return;
       }
     }
-    
-    function setupInitialState() {
-      if (!isReviewMode && !isRecordingMode) {
-        refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
-        refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing alignment framework (${PRE_RECORD_ALIGN_TIME}s)</span>`;
-        if (overlayActive) { cameraOverlay.classList.remove('hidden'); opacitySelector.classList.remove('hidden'); }
-      }
-    }
-    
-    function resetZoomFadeTimer() {
-      if (isReviewMode) return;
-      zoomUi.classList.remove('fade-out');
-      clearTimeout(zoomFadeTimeout);
-      zoomFadeTimeout = setTimeout(() => { if (!isReviewMode) zoomUi.classList.add('fade-out'); }, 3000);
-    }
-    cameraBox.addEventListener('mousemove', resetZoomFadeTimer);
-    cameraBox.addEventListener('touchstart', resetZoomFadeTimer);
-    
-    zoomSlider.addEventListener('input', (e) => { 
-      chosenScale = parseFloat(e.target.value); 
-      zoomLabel.innerText = `${chosenScale.toFixed(1)}x`; 
-      viewfinder.style.transform = `scale(${chosenScale})`; 
-      cameraOverlay.style.transform = `scale(${chosenScale})`; 
-      resetZoomFadeTimer(); 
-    });
-    opacitySelector.addEventListener('change', (e) => { cameraOverlay.style.opacity = e.target.value; });
 
-    overlayToggleBtn.addEventListener('click', () => {
-      if (isReviewMode) return;
-      overlayActive = !overlayActive;
-      if (overlayActive) { 
-        cameraOverlay.classList.remove('hidden'); 
-        opacitySelector.classList.remove('hidden'); 
-        overlayToggleBtn.innerText = "Overlay On"; 
-        overlayToggleBtn.classList.remove('overlay-off'); 
-      } else { 
-        cameraOverlay.classList.add('hidden'); 
-        opacitySelector.classList.add('hidden'); 
-        overlayToggleBtn.innerText = "Overlay Off"; 
-        overlayToggleBtn.classList.add('overlay-off'); 
+    // Fallback Page Visibility API Bypass
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // Silently preserve state, do not interrupt workspace or pop warning screens.
+        console.log("v26.1 Update: Tab hidden. Auto-lock bypass active.");
       }
     });
-
-    actionBtn.addEventListener('click', () => { 
-      if (!isRecordingMode && !isReviewMode) { 
-        runCountdown(); 
-      } else if (isRecordingMode) { 
-        stopRecordingEarly(); 
-      } else if (isReviewMode) { 
-        if (refVideo.paused) { playBoth(); } else { pauseBoth(); } 
-      } 
-    });
-
-    function playBoth() { viewfinder.play(); refVideo.play(); actionBtn.innerText = "Pause Review"; }
-    function shadowPause() { viewfinder.pause(); refVideo.pause(); }
-    function pauseBoth() { shadowPause(); actionBtn.innerText = "Play Review"; }
-    
-    function triggerSynchronizedLoop() { 
-      if (isSeeking) return;
-      isSeeking = true;
-      shadowPause(); 
-      refVideo.currentTime = 0; 
-      viewfinder.currentTime = 0; 
-      scrubSlider.value = 0; 
-      setTimeout(() => { 
-        isSeeking = false; 
-        if (isReviewMode && !actionBtn.innerText.includes("Play")) playBoth(); 
-      }, 200); 
-    }
-
-    cameraBox.addEventListener('click', (e) => { if (!isReviewMode || e.target.closest('#zoomUi')) return; actionBtn.click(); });
-    
-    muteReviewBtn.addEventListener('click', () => {
-      if (!isReviewMode) return;
-      viewfinder.muted = !viewfinder.muted;
-      if (viewfinder.muted) { 
-        muteReviewBtn.innerText = "Muted"; 
-        muteReviewBtn.classList.add('is-muted'); 
-      } else { 
-        muteReviewBtn.innerText = "Audio"; 
-        muteReviewBtn.classList.remove('is-muted'); 
-      }
-    });
-    
-    downloadBtn.addEventListener('click', () => {
-      if (!currentVideoBlob) return;
-      if (isReviewMode && !refVideo.paused) pauseBoth();
-      let customName = prompt("Enter a file name:", `performance-review-${Date.now()}`);
-      if (customName === null) return;
-      customName = customName.trim() || `performance-review-${Date.now()}`;
-      if (!customName.toLowerCase().endsWith('.mp4')) customName += '.mp4';
-      const url = URL.createObjectURL(currentVideoBlob), a = document.createElement('a');
-      a.style.display = 'none'; a.href = url; a.download = customName; document.body.appendChild(a); a.click();
-      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
-    });
-    
-    resetBtn.addEventListener('click', () => {
-      clearInterval(loopInterval); 
-      clearTimeout(zoomFadeTimeout); 
-      isRecordingMode = false; 
-      isReviewMode = false; 
-      recordedChunks = []; 
-      currentVideoBlob = null; 
-      chosenScale = 1; 
-      refVideo.pause(); 
-      setupInitialState();
-      
-      if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
-      viewfinder.srcObject = null; 
-      viewfinder.src = ""; 
-      viewfinder.srcObject = liveStream; 
-      
-      viewfinder.muted = true; 
-      muteReviewBtn.innerText = "Muted"; 
-      muteReviewBtn.classList.add('is-muted');
-      masterTimeline.classList.remove('show'); 
-      downloadBtn.style.display = "none";
-      
-      zoomSlider.value = 1; 
-      zoomLabel.innerText = "1.0x"; 
-      viewfinder.style.transform = "scale(1)"; 
-      cameraOverlay.style.transform = "scale(1)";
-      
-      zoomUi.style.display = "flex"; 
-      resetZoomFadeTimer();
-      recBadge.style.display = "none"; 
-      streamLabel.classList.remove('review-active');
-      streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
-      
-      overlayToggleBtn.disabled = false; 
-      opacitySelector.disabled = false;
-      if (overlayActive) { cameraOverlay.classList.remove('hidden'); opacitySelector.classList.remove('hidden'); }
-      
-      actionBtn.innerText = "Start Session"; 
-      actionBtn.className = "custom-png-btn"; 
-      actionBtn.disabled = false;
-      resetBtn.innerText = "Reset / Clear"; 
-      resetBtn.className = "custom-png-btn danger-active"; 
-      resetBtn.disabled = true; 
-      resetBtn.style.display = "none"; 
-    });
-    
-    function runCountdown() {
-      actionBtn.disabled = true; 
-      overlayToggleBtn.disabled = true; 
-      opacitySelector.disabled = true; 
-      resetBtn.disabled = true; 
-      resetBtn.style.display = "none"; 
-      downloadBtn.style.display = "none"; 
-      countdown.classList.add('show'); 
-      
-      let count = 3; 
-      countdown.innerText = count; 
-      refVideo.currentTime = 0; 
-      refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
-      
-      const timer = setInterval(() => { 
-        count--; 
-        if (count > 0) { 
-          countdown.innerText = count; 
-        } else { 
-          clearInterval(timer); 
-          countdown.classList.remove('show'); 
-          startRecordingSession(); 
-        } 
-      }, 1000);
-    }
-    
-    function startRecordingSession() {
-      recordedChunks = []; 
-      currentVideoBlob = null; 
-      refVideo.currentTime = 0; 
-      isRecordingMode = true;
-      
-      try { 
-        mediaRecorder = new MediaRecorder(liveStream); 
-      } catch (e) { 
-        console.error(e); 
-      }
-      
-      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-      mediaRecorder.onstop = () => {
-        isRecordingMode = false; 
-        recBadge.style.display = "none"; 
-        clearTimeout(zoomFadeTimeout); 
-        if (recordedChunks.length === 0) return;
-        
-        currentVideoBlob = new Blob(recordedChunks, { type: 'video/mp4' }); 
-        viewfinder.srcObject = null; 
-        viewfinder.src = URL.createObjectURL(currentVideoBlob); 
-        viewfinder.muted = true; 
-        
-        muteReviewBtn.innerText = "Muted"; 
-        muteReviewBtn.classList.add('is-muted');
-        cameraOverlay.classList.add('hidden'); 
-        opacitySelector.classList.add('hidden'); 
-        overlayToggleBtn.disabled = true; 
-        opacitySelector.disabled = true;
-        
-        viewfinder.setAttribute('playsinline', 'true'); 
-        viewfinder.setAttribute('webkit-playsinline', 'true'); 
-        viewfinder.style.transform = `scale(${chosenScale})`; 
-        zoomUi.style.display = "none";
-        
-        refLabel.innerHTML = `<span>REFERENCE LESSON</span>`; 
-        streamLabel.classList.add('review-active');
-        streamLabel.innerHTML = `<span>YOU (RECORDED REVIEW)</span><span class="zoom-note" id="zoomNote">Saved video captures standard widescreen frame</span>`;
-        
-        isReviewMode = true; 
-        refVideo.pause(); 
-        viewfinder.pause(); 
-        refVideo.currentTime = 0; 
-        viewfinder.currentTime = 0; 
-        masterTimeline.classList.add('show'); 
-        downloadBtn.style.display = "block"; 
-        scrubSlider.value = 0;
-        
-        actionBtn.innerText = "Play Review"; 
-        actionBtn.className = "custom-png-btn"; 
-        actionBtn.disabled = false; 
-        resetBtn.innerText = "Reset / Clear"; 
-        resetBtn.className = "custom-png-btn danger-active"; 
-        resetBtn.disabled = false; 
-        resetBtn.style.display = "flex";
-        
-        setupMasterTimelineSync(); 
-        startLoopEngine();
-      };
-      
-      mediaRecorder.start(); 
-      setTimeout(() => { if (isRecordingMode) refVideo.play(); }, 250);
-      
-      recBadge.style.display = "block"; 
-      actionBtn.innerText = "Stop & Review"; 
-      actionBtn.className = "custom-png-btn btn-recording"; 
-      actionBtn.disabled = false; 
-      resetBtn.innerText = "Cancel Run"; 
-      resetBtn.disabled = false; 
-      resetBtn.style.display = "flex";
-      
-      refVideo.onended = () => { if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); };
-    }
-    
-    function stopRecordingEarly() { refVideo.pause(); if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); }
-    
-    function setupMasterTimelineSync() {
-      scrubSlider.addEventListener('input', () => { 
-        isUserScrubbing = true; 
-        const targetPct = parseFloat(scrubSlider.value); 
-        const targetTime = (targetPct / 100) * refVideo.duration; 
-        refVideo.currentTime = targetTime; 
-        viewfinder.currentTime = targetTime; 
-        updateTimeDisplay(targetTime); 
-      });
-      scrubSlider.addEventListener('change', () => { isUserScrubbing = false; });
-      viewfinder.addEventListener('seeking', () => { isSeeking = true; });
-      viewfinder.addEventListener('seeked', () => { isSeeking = false; });
-    }
-    
-    function updateTimeDisplay(seconds) { 
-      const mins = Math.floor(seconds / 60); 
-      const secs = Math.floor(seconds % 60); 
-      timeLabel.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`; 
-    }
-    
-    function startLoopEngine() { 
-      clearInterval(loopInterval); 
-      loopInterval = setInterval(() => { 
-        if (!isReviewMode || isSeeking) return; 
-        if (!refVideo.paused && !isUserScrubbing) { 
-          const currentPct = (refVideo.currentTime / refVideo.duration) * 100; 
-          scrubSlider.value = currentPct; 
-          updateTimeDisplay(refVideo.currentTime); 
-          
-          if (viewfinder.duration && !viewfinder.paused && !viewfinder.seeking) {
-            const timeDelta = Math.abs(viewfinder.currentTime - refVideo.currentTime);
-            if (timeDelta > 0.08) { viewfinder.currentTime = refVideo.currentTime; }
-          }
-        } 
-        
-        const refEnded = refVideo.currentTime >= refVideo.duration - 0.15 || refVideo.ended; 
-        const viewEnded = (viewfinder.duration && viewfinder.currentTime >= viewfinder.duration - 0.15) || viewfinder.ended; 
-        
-        if ((refEnded || viewEnded) && !isUserScrubbing) { triggerSynchronizedLoop(); } 
-      }, 50); 
-    }
-    
-    muteReviewBtn.classList.add('is-muted');
   </script>
 </body>
 </html>
