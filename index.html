@@ -55,10 +55,8 @@
       font-family: inherit;
       transition: border-color 0.2s ease;
     }
-    /* Changed focus outline border color from blue to red */
     .gate-input:focus { border-color: #ff453a; }
     
-    /* Added your requested Google Drive image as the background of the unlock button */
     .gate-btn {
       width: 100%;
       height: 44px;
@@ -66,7 +64,7 @@
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
-      background-color: #007aff; /* Fallback color */
+      background-color: transparent; /* Makes background perfectly clear under the image asset */
       border: none;
       border-radius: 8px;
       color: white;
@@ -78,7 +76,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      text-shadow: 0 1px 4px rgba(0,0,0,0.8); /* Ensures text is highly readable over the image background */
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
     }
     .gate-btn:active { transform: scale(0.98); filter: brightness(0.85); }
     .gate-error { color: #ff453a; font-size: 12px; margin-top: 10px; display: none; }
@@ -257,20 +255,15 @@
   </div>
 
   <script>
-    // Updated secret password key (all lowercase)
     const SECRET_KEY = "waikato"; 
 
     function unlockPortal() {
-      // Trim spaces and convert to lowercase to make user input robust
       const input = document.getElementById('gatePass').value.trim().toLowerCase();
       const errorDiv = document.getElementById('gateError');
       
       if (input === SECRET_KEY) {
-        // Correct Password -> Instantly reveal the main content interface
         document.getElementById('passwordGate').style.display = 'none';
         document.getElementById('appContent').style.display = 'flex';
-        
-        // Start the camera. If it fails or is blocked, the app won't crash.
         initCamera();
       } else {
         errorDiv.style.display = 'block';
@@ -278,7 +271,6 @@
       }
     }
 
-    // Allow pressing "Enter" key to unlock
     document.getElementById('gatePass').addEventListener('keypress', function(e) {
       if (e.key === 'Enter') unlockPortal();
     });
@@ -315,8 +307,8 @@
         resetZoomFadeTimer();
         setupInitialState();
       } catch (err) { 
-        console.warn("Camera and Microphone access could not be acquired automatically:", err); 
-        setupInitialState(); // Allow structural fallback
+        console.warn("Camera access could not be acquired automatically:", err); 
+        setupInitialState();
       }
     }
     
