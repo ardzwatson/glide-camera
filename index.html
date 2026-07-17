@@ -60,13 +60,10 @@
     }
     .gate-input:focus { border-color: #ff453a; }
     
-    .gate-btn {
+   .gate-btn {
+      position: relative; /* Create anchoring context for the absolute pseudo-element */
       width: 100%;
       height: 44px;
-      background-image: url('https://lh3.googleusercontent.com/d/121yd-uXZ_3mkD9kYfgTuX_RbmtE-_mEv');
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
       background-color: transparent;
       border: none;
       border-radius: 8px;
@@ -80,6 +77,21 @@
       align-items: center;
       justify-content: center;
       text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+      overflow: hidden; /* Keep the pseudo-element image within the border radius bounds */
+      z-index: 1; /* Isolates stacking context so text stays on top */
+    }
+
+    /* Target the background layer separately to apply opacity */
+    .gate-btn::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: url('https://lh3.googleusercontent.com/d/121yd-uXZ_3mkD9kYfgTuX_RbmtE-_mEv');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0.4; /* Set background image opacity to 40% */
+      z-index: -1; /* Layer it safely underneath your button text */
     }
     .gate-btn:active { transform: scale(0.98); filter: brightness(0.85); }
     .gate-error { color: #ff453a; font-size: 12px; margin-top: 10px; display: none; }
