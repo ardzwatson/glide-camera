@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Performance Review (V25.2)</title>
+  <title>Sync Performance Review (V25.3)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -13,6 +13,73 @@
       font-family: 'Marcellus', -apple-system, BlinkMacSystemFont, serif; overflow: hidden; display: flex; flex-direction: column;
       padding: env(safe-area-inset-top, 8px) 12px calc(env(safe-area-inset-bottom, 0px) + 8px) 12px;
     }
+
+    /* --- PASSWORD GATE STYLES --- */
+    #passwordGate {
+      position: fixed;
+      inset: 0;
+      background: #111;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 20px;
+    }
+    .gate-card {
+      background: #1c1c1e;
+      border: 1px solid #2c2c2e;
+      padding: 40px 30px;
+      border-radius: 16px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+      max-width: 360px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .gate-card h2 { margin: 0 0 10px 0; font-size: 24px; letter-spacing: 1px; color: #fff; }
+    .gate-card p { margin: 0 0 24px 0; font-size: 13px; color: #8e8e93; }
+    .gate-input {
+      width: 100%;
+      height: 44px;
+      background: #2c2c2e;
+      border: 1px solid #3a3a3c;
+      border-radius: 8px;
+      color: white;
+      text-align: center;
+      font-size: 16px;
+      outline: none;
+      box-sizing: border-box;
+      margin-bottom: 16px;
+      font-family: inherit;
+    }
+    .gate-input:focus { border-color: #007aff; }
+    .gate-btn {
+      width: 100%;
+      height: 44px;
+      background: #007aff;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    .gate-btn:active { background: #0056b3; }
+    .gate-error { color: #ff453a; font-size: 12px; margin-top: 10px; display: none; }
+
+    /* App content container (hidden until unlocked) */
+    #appContent {
+      display: none;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* --- ORIGINAL STYLES --- */
     .container { display: flex; flex-direction: column; gap: 12px; width: 100%; flex-grow: 1; min-height: 0; }
     @media (orientation: landscape) {
       body, html { padding: env(safe-area-inset-top, 4px) 8px calc(env(safe-area-inset-bottom, 0px) + 4px) 8px; }
@@ -30,7 +97,6 @@
     .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; }
     video { width: 100%; height: 100%; object-fit: cover; background: #000; transition: transform 0.1s ease-out; transform-origin: center center; }
     
-    /* Live Cam Ghost Overlay Styles */
     .viewfinder-overlay {
       position: absolute;
       inset: 0;
@@ -85,7 +151,6 @@
     #actionBtn { background-color: #007aff; border-radius: 8px; background-image: url('images/start-btn.png'); }
     #actionBtn.btn-recording { background-color: #ff453a !important; background-image: url('images/stop-btn.png') !important; }
     
-    /* Dynamic reset visibility profiles */
     #resetBtn { background-color: #8e8e93; border-radius: 8px; background-image: url('images/reset-btn.png'); display: none; }
     #resetBtn.danger-active { background-color: #ff3b30; background-image: url('images/clear-btn.png'); }
     
@@ -120,50 +185,89 @@
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="box">
-      <div class="label" id="refLabel">REFERENCE LESSON</div>
-      <video id="refVideo" 
-             src="https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4" 
-             poster="https://res.cloudinary.com/dgz4sxuj5/video/upload/so_20/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.jpg" 
-             preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
-      <div class="countdown-overlay" id="countdown">3</div>
+
+  <!-- PASSWORD GATE OVERLAY -->
+  <div id="passwordGate">
+    <div class="gate-card">
+      <h2>SECURE PORTAL</h2>
+      <p>Please enter your access key to begin.</p>
+      <input type="password" id="gatePass" class="gate-input" placeholder="••••••••" autofocus>
+      <button onclick="unlockPortal()" class="gate-btn">Unlock</button>
+      <div id="gateError" class="gate-error">Incorrect passcode. Please try again.</div>
     </div>
-    <div class="box" id="cameraBox">
-      <div class="label" id="streamLabel"><span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span></div>
-      <div class="rec-indicator" id="recBadge">● RECORDING</div>
-      <div class="viewfinder-container">
-        <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
-        <div id="cameraOverlay" class="viewfinder-overlay"></div>
+  </div>
+
+  <!-- MAIN APP CONTAINER (Hidden initially) -->
+  <div id="appContent">
+    <div class="container">
+      <div class="box">
+        <div class="label" id="refLabel">REFERENCE LESSON</div>
+        <video id="refVideo" 
+               src="https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4" 
+               poster="https://res.cloudinary.com/dgz4sxuj5/video/upload/so_20/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.jpg" 
+               preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
+        <div class="countdown-overlay" id="countdown">3</div>
       </div>
-      <div class="zoom-container" id="zoomUi"><input type="range" id="zoomSlider" class="zoom-slider" min="1" max="2" step="0.1" value="1"><label id="zoomLabel">1.0x</label></div>
+      <div class="box" id="cameraBox">
+        <div class="label" id="streamLabel"><span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span></div>
+        <div class="rec-indicator" id="recBadge">● RECORDING</div>
+        <div class="viewfinder-container">
+          <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
+          <div id="cameraOverlay" class="viewfinder-overlay"></div>
+        </div>
+        <div class="zoom-container" id="zoomUi"><input type="range" id="zoomSlider" class="zoom-slider" min="1" max="2" step="0.1" value="1"><label id="zoomLabel">1.0x</label></div>
+      </div>
+    </div>
+    <div class="timeline-footer" id="masterTimeline">
+      <input type="range" id="scrubSlider" class="timeline-slider" min="0" max="100" step="0.1" value="0">
+      <div class="time-display" id="timeLabel">0:00</div>
+      <div class="mute-btn-container"><button class="mute-btn" id="muteReviewBtn">Muted</button></div>
+    </div>
+    <div class="controls-footer">
+      <button id="actionBtn" class="custom-png-btn">Start Session</button>
+      <button id="resetBtn" class="custom-png-btn" disabled>Reset / Clear</button>
+      <button id="overlayToggleBtn" class="custom-png-btn">Overlay On</button>
+      <select id="opacitySelector" class="custom-select-ui">
+        <option value="0.1">10%</option>
+        <option value="0.2">20%</option>
+        <option value="0.3" selected>30%</option>
+        <option value="0.4">40%</option>
+        <option value="0.5">50%</option>
+        <option value="0.6">60%</option>
+        <option value="0.7">70%</option>
+        <option value="0.8">80%</option>
+        <option value="0.9">90%</option>
+        <option value="1.0">100%</option>
+      </select>
+      <button id="downloadBtn" class="custom-png-btn">Save</button>
+      <div class="version-tag">V25.3</div>
     </div>
   </div>
-  <div class="timeline-footer" id="masterTimeline">
-    <input type="range" id="scrubSlider" class="timeline-slider" min="0" max="100" step="0.1" value="0">
-    <div class="time-display" id="timeLabel">0:00</div>
-    <div class="mute-btn-container"><button class="mute-btn" id="muteReviewBtn">Muted</button></div>
-  </div>
-  <div class="controls-footer">
-    <button id="actionBtn" class="custom-png-btn">Start Session</button>
-    <button id="resetBtn" class="custom-png-btn" disabled>Reset / Clear</button>
-    <button id="overlayToggleBtn" class="custom-png-btn">Overlay On</button>
-    <select id="opacitySelector" class="custom-select-ui">
-      <option value="0.1">10%</option>
-      <option value="0.2">20%</option>
-      <option value="0.3" selected>30%</option>
-      <option value="0.4">40%</option>
-      <option value="0.5">50%</option>
-      <option value="0.6">60%</option>
-      <option value="0.7">70%</option>
-      <option value="0.8">80%</option>
-      <option value="0.9">90%</option>
-      <option value="1.0">100%</option>
-    </select>
-    <button id="downloadBtn" class="custom-png-btn">Save</button>
-    <div class="version-tag">V25.2</div>
-  </div>
+
   <script>
+    const SECRET_KEY = "waikato”; 
+
+    function unlockPortal() {
+      const input = document.getElementById('gatePass').value;
+      const errorDiv = document.getElementById('gateError');
+      
+      if (input === SECRET_KEY) {
+        // Hide gate & show app content
+        document.getElementById('passwordGate').style.display = 'none';
+        document.getElementById('appContent').style.display = 'flex';
+        // Initialize camera stream *only* after unlocking successfully
+        initCamera();
+      } else {
+        errorDiv.style.display = 'block';
+        document.getElementById('gatePass').value = '';
+      }
+    }
+
+    // Allow pressing "Enter" key to unlock
+    document.getElementById('gatePass').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') unlockPortal();
+    });
+
     const refVideo = document.getElementById('refVideo');
     const viewfinder = document.getElementById('viewfinder');
     const cameraOverlay = document.getElementById('cameraOverlay');
@@ -309,12 +413,12 @@
       
       actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
       resetBtn.innerText = "Reset / Clear"; resetBtn.className = "custom-png-btn"; resetBtn.disabled = true;
-      resetBtn.style.display = "none"; // Hide button immediately on reset completion
+      resetBtn.style.display = "none"; 
     });
     
     function runCountdown() {
       actionBtn.disabled = true; overlayToggleBtn.disabled = true; opacitySelector.disabled = true; 
-      resetBtn.disabled = true; resetBtn.style.display = "none"; // Ensure hidden during countdown
+      resetBtn.disabled = true; resetBtn.style.display = "none"; 
       downloadBtn.style.display = "none"; countdown.classList.add('show'); let count = 3; countdown.innerText = count; refVideo.currentTime = 0; refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
       const timer = setInterval(() => { count--; if (count > 0) { countdown.innerText = count; } else { clearInterval(timer); countdown.classList.remove('show'); startRecordingSession(); } }, 1000);
     }
@@ -345,14 +449,12 @@
         isReviewMode = true; refVideo.pause(); viewfinder.pause(); refVideo.currentTime = 0; viewfinder.currentTime = 0; masterTimeline.classList.add('show'); downloadBtn.style.display = "block"; scrubSlider.value = 0;
         actionBtn.innerText = "Play Review"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false; 
         
-        // Show complete session clear option
         resetBtn.innerText = "Reset / Clear"; resetBtn.className = "custom-png-btn danger-active"; resetBtn.disabled = false; resetBtn.style.display = "flex";
         setupMasterTimelineSync(); startLoopEngine();
       };
       mediaRecorder.start(); setTimeout(() => { if (isRecordingMode) refVideo.play(); }, 250);
       recBadge.style.display = "block"; actionBtn.innerText = "Stop & Review"; actionBtn.className = "custom-png-btn btn-recording"; actionBtn.disabled = false; 
       
-      // Reveal button as an available "Cancel Run" action during capture
       resetBtn.innerText = "Cancel Run"; resetBtn.disabled = false; resetBtn.style.display = "flex";
       refVideo.onended = () => { if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); };
     }
@@ -400,9 +502,9 @@
     }
     
     muteReviewBtn.classList.add('is-muted');
-    
-    window.addEventListener('load', initCamera);
-    window.addEventListener('DOMContentLoaded', initCamera);
+
+    // Note: initCamera() call removed from window load event to prevent starting 
+    // the webcam before the user successfully logs in.
   </script>
 </body>
 </html>
