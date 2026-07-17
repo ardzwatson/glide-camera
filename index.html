@@ -28,7 +28,10 @@
       padding: 20px;
     }
     .gate-card {
-      background: #1c1c1e;
+      background-image: url('https://lh3.googleusercontent.com/d/1B2Dk1T1vTjx0QaqoJIPZs9wvx09M60AG'); /* Animated GIF background */
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
       border: 1px solid #2c2c2e;
       padding: 40px 30px;
       border-radius: 16px;
@@ -64,7 +67,7 @@
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
-      background-color: transparent; /* Makes background perfectly clear under the image asset */
+      background-color: transparent;
       border: none;
       border-radius: 8px;
       color: white;
@@ -301,25 +304,14 @@
     const PRE_RECORD_ALIGN_TIME = 20;
 
     async function initCamera() {
-      try {
-        liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 360 } }, audio: true });
-        viewfinder.srcObject = liveStream;
-        resetZoomFadeTimer();
-        setupInitialState();
-      } catch (err) { 
-        console.warn("Camera access could not be acquired automatically:", err); 
-        setupInitialState();
-      }
+      try { liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 360 } }, audio: true }); viewfinder.srcObject = liveStream; resetZoomFadeTimer(); setupInitialState(); } catch (err) { console.warn("Camera access could not be acquired automatically:", err); setupInitialState(); }
     }
     
     function setupInitialState() {
       if (!isReviewMode && !isRecordingMode) {
         refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
         refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing alignment framework (${PRE_RECORD_ALIGN_TIME}s)</span>`;
-        if (overlayActive) {
-          cameraOverlay.classList.remove('hidden');
-          opacitySelector.classList.remove('hidden');
-        }
+        if (overlayActive) { cameraOverlay.classList.remove('hidden'); opacitySelector.classList.remove('hidden'); }
       }
     }
     
@@ -332,32 +324,14 @@
     cameraBox.addEventListener('mousemove', resetZoomFadeTimer);
     cameraBox.addEventListener('touchstart', resetZoomFadeTimer);
     
-    zoomSlider.addEventListener('input', (e) => { 
-      chosenScale = parseFloat(e.target.value); 
-      zoomLabel.innerText = `${chosenScale.toFixed(1)}x`; 
-      viewfinder.style.transform = `scale(${chosenScale})`; 
-      cameraOverlay.style.transform = `scale(${chosenScale})`; 
-      resetZoomFadeTimer(); 
-    });
-
-    opacitySelector.addEventListener('change', (e) => {
-      cameraOverlay.style.opacity = e.target.value;
-    });
+    zoomSlider.addEventListener('input', (e) => { chosenScale = parseFloat(e.target.value); zoomLabel.innerText = `${chosenScale.toFixed(1)}x`; viewfinder.style.transform = `scale(${chosenScale})`; cameraOverlay.style.transform = `scale(${chosenScale})`; resetZoomFadeTimer(); });
+    opacitySelector.addEventListener('change', (e) => { cameraOverlay.style.opacity = e.target.value; });
 
     overlayToggleBtn.addEventListener('click', () => {
       if (isReviewMode) return;
       overlayActive = !overlayActive;
-      if (overlayActive) {
-        cameraOverlay.classList.remove('hidden');
-        opacitySelector.classList.remove('hidden');
-        overlayToggleBtn.innerText = "Overlay On";
-        overlayToggleBtn.classList.remove('overlay-off');
-      } else {
-        cameraOverlay.classList.add('hidden');
-        opacitySelector.classList.add('hidden');
-        overlayToggleBtn.innerText = "Overlay Off";
-        overlayToggleBtn.classList.add('overlay-off');
-      }
+      if (overlayActive) { cameraOverlay.classList.remove('hidden'); opacitySelector.classList.remove('hidden'); overlayToggleBtn.innerText = "Overlay On"; overlayToggleBtn.classList.remove('overlay-off'); } 
+      else { cameraOverlay.classList.add('hidden'); opacitySelector.classList.add('hidden'); overlayToggleBtn.innerText = "Overlay Off"; overlayToggleBtn.classList.add('overlay-off'); }
     });
 
     actionBtn.addEventListener('click', () => { if (!isRecordingMode && !isReviewMode) { runCountdown(); } else if (isRecordingMode) { stopRecordingEarly(); } else if (isReviewMode) { if (refVideo.paused) { playBoth(); } else { pauseBoth(); } } });
@@ -368,18 +342,11 @@
     function triggerSynchronizedLoop() { 
       if (isSeeking) return;
       isSeeking = true;
-      shadowPause(); 
-      refVideo.currentTime = 0; 
-      viewfinder.currentTime = 0; 
-      scrubSlider.value = 0; 
-      setTimeout(() => { 
-        isSeeking = false;
-        if (isReviewMode && !actionBtn.innerText.includes("Play")) playBoth(); 
-      }, 200); 
+      shadowPause(); refVideo.currentTime = 0; viewfinder.currentTime = 0; scrubSlider.value = 0; 
+      setTimeout(() => { isSeeking = false; if (isReviewMode && !actionBtn.innerText.includes("Play")) playBoth(); }, 200); 
     }
 
     cameraBox.addEventListener('click', (e) => { if (!isReviewMode || e.target.closest('#zoomUi')) return; actionBtn.click(); });
-    
     muteReviewBtn.addEventListener('click', () => {
       if (!isReviewMode) return;
       viewfinder.muted = !viewfinder.muted;
@@ -403,32 +370,20 @@
       clearInterval(loopInterval); clearTimeout(zoomFadeTimeout); isRecordingMode = false; isReviewMode = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1; refVideo.pause(); setupInitialState();
       if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
       viewfinder.srcObject = null; viewfinder.src = ""; viewfinder.srcObject = liveStream; 
-      
-      viewfinder.muted = true;
-      muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
-      
+      viewfinder.muted = true; muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
       masterTimeline.classList.remove('show'); downloadBtn.style.display = "none";
       zoomSlider.value = 1; zoomLabel.innerText = "1.0x"; viewfinder.style.transform = "scale(1)"; cameraOverlay.style.transform = "scale(1)";
       zoomUi.style.display = "flex"; resetZoomFadeTimer();
-      recBadge.style.display = "none"; 
-      streamLabel.classList.remove('review-active');
+      recBadge.style.display = "none"; streamLabel.classList.remove('review-active');
       streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
-      
-      overlayToggleBtn.disabled = false;
-      opacitySelector.disabled = false;
-      if (overlayActive) {
-        cameraOverlay.classList.remove('hidden');
-        opacitySelector.classList.remove('hidden');
-      }
-      
+      overlayToggleBtn.disabled = false; opacitySelector.disabled = false;
+      if (overlayActive) { cameraOverlay.classList.remove('hidden'); opacitySelector.classList.remove('hidden'); }
       actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
-      resetBtn.innerText = "Reset / Clear"; resetBtn.className = "custom-png-btn"; resetBtn.disabled = true;
-      resetBtn.style.display = "none"; 
+      resetBtn.innerText = "Reset / Clear"; resetBtn.className = "custom-png-btn"; resetBtn.disabled = true; resetBtn.style.display = "none"; 
     });
     
     function runCountdown() {
-      actionBtn.disabled = true; overlayToggleBtn.disabled = true; opacitySelector.disabled = true; 
-      resetBtn.disabled = true; resetBtn.style.display = "none"; 
+      actionBtn.disabled = true; overlayToggleBtn.disabled = true; opacitySelector.disabled = true; resetBtn.disabled = true; resetBtn.style.display = "none"; 
       downloadBtn.style.display = "none"; countdown.classList.add('show'); let count = 3; countdown.innerText = count; refVideo.currentTime = 0; refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
       const timer = setInterval(() => { count--; if (count > 0) { countdown.innerText = count; } else { clearInterval(timer); countdown.classList.remove('show'); startRecordingSession(); } }, 1000);
     }
@@ -440,47 +395,26 @@
       mediaRecorder.onstop = () => {
         isRecordingMode = false; recBadge.style.display = "none"; clearTimeout(zoomFadeTimeout); if (recordedChunks.length === 0) return;
         currentVideoBlob = new Blob(recordedChunks, { type: 'video/mp4' }); viewfinder.srcObject = null; viewfinder.src = URL.createObjectURL(currentVideoBlob); 
-        
-        viewfinder.muted = true;
-        muteReviewBtn.innerText = "Muted";
-        muteReviewBtn.classList.add('is-muted');
-        
-        cameraOverlay.classList.add('hidden');
-        opacitySelector.classList.add('hidden');
-        overlayToggleBtn.disabled = true;
-        opacitySelector.disabled = true;
-        
+        viewfinder.muted = true; muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
+        cameraOverlay.classList.add('hidden'); opacitySelector.classList.add('hidden'); overlayToggleBtn.disabled = true; opacitySelector.disabled = true;
         viewfinder.setAttribute('playsinline', 'true'); viewfinder.setAttribute('webkit-playsinline', 'true'); viewfinder.style.transform = `scale(${chosenScale})`; zoomUi.style.display = "none";
-        refLabel.innerHTML = `<span>REFERENCE LESSON</span>`; 
-        
-        streamLabel.classList.add('review-active');
+        refLabel.innerHTML = `<span>REFERENCE LESSON</span>`; streamLabel.classList.add('review-active');
         streamLabel.innerHTML = `<span>YOU (RECORDED REVIEW)</span><span class="zoom-note" id="zoomNote">Saved video captures standard widescreen frame</span>`;
-        
         isReviewMode = true; refVideo.pause(); viewfinder.pause(); refVideo.currentTime = 0; viewfinder.currentTime = 0; masterTimeline.classList.add('show'); downloadBtn.style.display = "block"; scrubSlider.value = 0;
         actionBtn.innerText = "Play Review"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false; 
-        
         resetBtn.innerText = "Reset / Clear"; resetBtn.className = "custom-png-btn danger-active"; resetBtn.disabled = false; resetBtn.style.display = "flex";
         setupMasterTimelineSync(); startLoopEngine();
       };
       mediaRecorder.start(); setTimeout(() => { if (isRecordingMode) refVideo.play(); }, 250);
       recBadge.style.display = "block"; actionBtn.innerText = "Stop & Review"; actionBtn.className = "custom-png-btn btn-recording"; actionBtn.disabled = false; 
-      
       resetBtn.innerText = "Cancel Run"; resetBtn.disabled = false; resetBtn.style.display = "flex";
       refVideo.onended = () => { if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); };
     }
     function stopRecordingEarly() { refVideo.pause(); if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); }
     
     function setupMasterTimelineSync() {
-      scrubSlider.addEventListener('input', () => { 
-        isUserScrubbing = true; 
-        const targetPct = parseFloat(scrubSlider.value); 
-        const targetTime = (targetPct / 100) * refVideo.duration; 
-        refVideo.currentTime = targetTime; 
-        viewfinder.currentTime = targetTime; 
-        updateTimeDisplay(targetTime); 
-      });
+      scrubSlider.addEventListener('input', () => { isUserScrubbing = true; const targetPct = parseFloat(scrubSlider.value); const targetTime = (targetPct / 100) * refVideo.duration; refVideo.currentTime = targetTime; viewfinder.currentTime = targetTime; updateTimeDisplay(targetTime); });
       scrubSlider.addEventListener('change', () => { isUserScrubbing = false; });
-      
       viewfinder.addEventListener('seeking', () => { isSeeking = true; });
       viewfinder.addEventListener('seeked', () => { isSeeking = false; });
     }
@@ -492,22 +426,15 @@
       loopInterval = setInterval(() => { 
         if (!isReviewMode || isSeeking) return; 
         if (!refVideo.paused && !isUserScrubbing) { 
-          const currentPct = (refVideo.currentTime / refVideo.duration) * 100; 
-          scrubSlider.value = currentPct; 
-          updateTimeDisplay(refVideo.currentTime); 
-          
+          const currentPct = (refVideo.currentTime / refVideo.duration) * 100; scrubSlider.value = currentPct; updateTimeDisplay(refVideo.currentTime); 
           if (viewfinder.duration && !viewfinder.paused && !viewfinder.seeking) {
             const timeDelta = Math.abs(viewfinder.currentTime - refVideo.currentTime);
-            if (timeDelta > 0.08) {
-              viewfinder.currentTime = refVideo.currentTime;
-            }
+            if (timeDelta > 0.08) { viewfinder.currentTime = refVideo.currentTime; }
           }
         } 
         const refEnded = refVideo.currentTime >= refVideo.duration - 0.15 || refVideo.ended; 
         const viewEnded = (viewfinder.duration && viewfinder.currentTime >= viewfinder.duration - 0.15) || viewfinder.ended; 
-        if ((refEnded || viewEnded) && !isUserScrubbing) { 
-          triggerSynchronizedLoop(); 
-        } 
+        if ((refEnded || viewEnded) && !isUserScrubbing) { triggerSynchronizedLoop(); } 
       }, 50); 
     }
     
