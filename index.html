@@ -245,17 +245,20 @@
   </div>
 
   <script>
-    const SECRET_KEY = "waikato”; 
+    // Updated secret password key (all lowercase)
+    const SECRET_KEY = "waikato"; 
 
     function unlockPortal() {
-      const input = document.getElementById('gatePass').value;
+      // Trim spaces and convert to lowercase to make user input robust
+      const input = document.getElementById('gatePass').value.trim().toLowerCase();
       const errorDiv = document.getElementById('gateError');
       
       if (input === SECRET_KEY) {
-        // Hide gate & show app content
+        // Correct Password -> Instantly reveal the main content interface
         document.getElementById('passwordGate').style.display = 'none';
         document.getElementById('appContent').style.display = 'flex';
-        // Initialize camera stream *only* after unlocking successfully
+        
+        // Start the camera. If it fails or is blocked, the app won't crash.
         initCamera();
       } else {
         errorDiv.style.display = 'block';
@@ -299,7 +302,10 @@
         viewfinder.srcObject = liveStream;
         resetZoomFadeTimer();
         setupInitialState();
-      } catch (err) { alert("Camera and Microphone access required."); console.error(err); }
+      } catch (err) { 
+        console.warn("Camera and Microphone access could not be acquired automatically:", err); 
+        setupInitialState(); // Allow structural fallback
+      }
     }
     
     function setupInitialState() {
@@ -502,9 +508,6 @@
     }
     
     muteReviewBtn.classList.add('is-muted');
-
-    // Note: initCamera() call removed from window load event to prevent starting 
-    // the webcam before the user successfully logs in.
   </script>
 </body>
 </html>
