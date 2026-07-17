@@ -60,7 +60,7 @@
     }
     .gate-input:focus { border-color: #ff453a; }
     
-   .gate-btn {
+    .gate-btn {
       position: relative; /* Create anchoring context for the absolute pseudo-element */
       width: 100%;
       height: 44px;
@@ -80,6 +80,7 @@
       overflow: hidden; /* Keep the pseudo-element image within the border radius bounds */
       z-index: 1; /* Isolates stacking context so text stays on top */
     }
+    .gate-btn:active { transform: scale(0.98); filter: brightness(0.85); }
 
     /* Target the background layer separately to apply opacity */
     .gate-btn::before {
@@ -93,7 +94,6 @@
       opacity: 0.4; /* Set background image opacity to 40% */
       z-index: -1; /* Layer it safely underneath your button text */
     }
-    .gate-btn:active { transform: scale(0.98); filter: brightness(0.85); }
     .gate-error { color: #ff453a; font-size: 12px; margin-top: 10px; display: none; }
 
     /* App content container (hidden until unlocked) */
@@ -120,7 +120,17 @@
     }
     .box { position: relative; width: 100%; flex: 1 1 0%; height: 0; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
     .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; }
-    video { width: 100%; height: 100%; object-fit: cover; background: #000; transition: transform 0.1s ease-out; transform-origin: center center; }
+    
+    video { 
+      width: 100%; 
+      height: 100%; 
+      object-fit: cover; 
+      background: #000; 
+      transition: transform 0.1s ease-out; 
+      transform-origin: center center; 
+      -webkit-touch-callout: none; /* Prevents long-press menu on iOS Safari */
+      user-select: none;           /* Prevents selection */
+    }
     
     .viewfinder-overlay {
       position: absolute;
@@ -227,8 +237,8 @@
     <div class="container">
       <div class="box">
         <div class="label" id="refLabel">REFERENCE LESSON</div>
+        <!-- Video Source completely stripped out of HTML definition to safeguard access -->
         <video id="refVideo" 
-               src="https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4" 
                poster="https://res.cloudinary.com/dgz4sxuj5/video/upload/so_20/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.jpg" 
                preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
         <div class="countdown-overlay" id="countdown">3</div>
@@ -271,6 +281,17 @@
 
   <script>
     const SECRET_KEY = "waikato"; 
+    const refVideo = document.getElementById('refVideo');
+
+    // 1. Block Context Menu Options (Save/Copy video)
+    refVideo.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+    });
+
+    // 2. Clear Source URL instantly once buffered into memory pipeline
+    refVideo.addEventListener('canplaythrough', () => {
+      refVideo.removeAttribute('src');
+    }, { once: true });
 
     function unlockPortal() {
       const input = document.getElementById('gatePass').value.trim().toLowerCase();
@@ -279,6 +300,10 @@
       if (input === SECRET_KEY) {
         document.getElementById('passwordGate').style.display = 'none';
         document.getElementById('appContent').style.display = 'flex';
+        
+        // Dynamic behind-the-scenes runtime asset loading injection
+        refVideo.src = "https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4";
+        
         initCamera();
       } else {
         errorDiv.style.display = 'block';
@@ -290,7 +315,6 @@
       if (e.key === 'Enter') unlockPortal();
     });
 
-    const refVideo = document.getElementById('refVideo');
     const viewfinder = document.getElementById('viewfinder');
     const cameraOverlay = document.getElementById('cameraOverlay');
     const actionBtn = document.getElementById('actionBtn');
@@ -391,7 +415,7 @@
       overlayToggleBtn.disabled = false; opacitySelector.disabled = false;
       if (overlayActive) { cameraOverlay.classList.remove('hidden'); opacitySelector.classList.remove('hidden'); }
       actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
-      resetBtn.innerText = "Reset / Clear"; resetBtn.className = "custom-png-btn"; resetBtn.disabled = true; resetBtn.style.display = "none"; 
+      resetBtn.innerText = "Reset / Clear"; resetBtn.className = "custom-png-btn danger-active"; resetBtn.disabled = true; resetBtn.style.display = "none"; 
     });
     
     function runCountdown() {
