@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V28.1)</title>
+  <title>Sync Performance Review (V27.6)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&amp;display=swap" rel="stylesheet">
@@ -15,21 +15,6 @@
       margin: 0; height: 100dvh; width: 100%; box-sizing: border-box; background: #111; color: white; 
       font-family: 'Marcellus', -apple-system, BlinkMacSystemFont, serif; overflow: hidden; display: flex; flex-direction: column;
       padding: env(safe-area-inset-top, 8px) 12px calc(env(safe-area-inset-bottom, 0px) + 8px) 12px;
-    }
-
-    /* --- CINEMATIC DISSOLVE TRANSITION OVERLAY --- */
-    #dissolveTransition {
-      position: fixed;
-      inset: 0;
-      background: #111;
-      opacity: 0;
-      z-index: 99999;
-      pointer-events: none;
-      transition: opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    }
-    #dissolveTransition.active { 
-      opacity: 1; 
-      pointer-events: auto; /* blocks clicks ONLY when fully transitioning */
     }
 
     /* --- PASSWORD GATE STYLES --- */
@@ -58,8 +43,6 @@
       max-width: 360px;
       width: 100%;
       box-sizing: border-box;
-      position: relative;
-      z-index: 10000;
     }
     .gate-card h2 { margin: 0 0 10px 0; font-size: 24px; letter-spacing: 1px; color: #fff; }
     .gate-card p { margin: 0 0 24px 0; font-size: 13px; color: #8e8e93; }
@@ -78,13 +61,13 @@
       font-family: inherit;
       transition: border-color 0.2s ease;
     }
-    .gate-input:focus { border-color: #007aff; }
+    .gate-input:focus { border-color: #ff453a; }
     
     .gate-btn {
       position: relative;
       width: 100%;
       height: 44px;
-      background-color: #007aff;
+      background-color: transparent;
       border: none;
       border-radius: 8px;
       color: white;
@@ -110,7 +93,7 @@
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
-      opacity: 0.15;
+      opacity: 0.4;
       z-index: -1;
     }
     .gate-error { color: #ff453a; font-size: 12px; margin-top: 10px; display: none; }
@@ -187,6 +170,7 @@
       position: relative;
     }
     
+    /* V27.6 Structural Unified Background Asset Overlay Setup */
     .sync-thumbnail-overlay {
       position: absolute;
       inset: 0;
@@ -226,7 +210,7 @@
     .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
     
     button.custom-png-btn, .custom-select-ui {
-      opacity: 0.85;
+      opacity: 0.85; /* V27.6 Dashboard Aesthetic Spec */
       transition: opacity 0.2s ease, transform 0.1s ease, filter 0.2s;
     }
     button.custom-png-btn:hover, .custom-select-ui:hover { opacity: 1.0; }
@@ -290,9 +274,6 @@
 </head>
 <body>
 
-  <!-- CINEMATIC DISSOLVE OVERLAY -->
-  <div id="dissolveTransition"></div>
-
   <!-- PASSWORD GATE OVERLAY -->
   <div id="passwordGate">
     <div class="gate-card">
@@ -300,7 +281,7 @@
       <p>Please enter your access key to begin.</p>
       <input type="password" id="gatePass" class="gate-input" placeholder="••••••••" autofocus>
       <button onclick="unlockPortal()" class="gate-btn">Unlock</button>
-      <div id="gateError" class="gate-error">Loading database... Please wait.</div>
+      <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
     </div>
   </div>
 
@@ -355,7 +336,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V28.1</div>
+      <div class="version-tag">V27.6</div>
     </div>
   </div>
 
@@ -369,6 +350,7 @@
     let watermarkTimer = null;
     let hlsInstance = null;
 
+    // V27.6 Isolated Web Audio API Context Configuration Pool
     let webAudioContext = null;
     let webAudioSourceNode = null;
     let webAudioGainNode = null;
@@ -379,7 +361,6 @@
     const gateError = document.getElementById('gateError');
     const watermarkEl = document.getElementById('videoWatermark');
     const signOutBtn = document.getElementById('signOutBtn');
-    const DISSOLVE_LAYER = document.getElementById('dissolveTransition');
 
     const viewfinder = document.getElementById('viewfinder');
     const actionBtn = document.getElementById('actionBtn');
@@ -404,21 +385,12 @@
     let overlayActive = true; 
     const PRE_RECORD_ALIGN_TIME = 20;
 
+    // Forced shared image background asset synchronizer setup
     function boundThumbnailsToFixedLayer() {
       refOverlay.style.backgroundImage = `url('${THUMBNAIL_ASSET}')`;
       cameraOverlay.style.backgroundImage = `url('${THUMBNAIL_ASSET}')`;
     }
     boundThumbnailsToFixedLayer();
-
-    function triggerCinematicDissolve(callback) {
-      DISSOLVE_LAYER.classList.add('active');
-      setTimeout(() => {
-        if (callback) callback();
-        setTimeout(() => {
-          DISSOLVE_LAYER.classList.remove('active');
-        }, 150);
-      }, 400);
-    }
 
     async function fetchAccessDatabase() {
       try {
@@ -428,19 +400,11 @@
         const lines = csvText.split(/\r?\n/);
         lines.forEach(line => {
           const columns = line.split(',').map(col => col.replace(/^"|"$/g, '').trim());
-          if (columns[0] && columns[1]) {
-            userDatabase[columns[0].toLowerCase()] = columns[1];
-          }
+          if (columns[0] && columns[1]) userDatabase[columns[0].toLowerCase()] = columns[1];
         });
-        if (gateError) { 
-          gateError.style.display = 'none'; 
-          gateError.innerText = "Incorrect passcode. Please try again."; 
-        }
+        if (gateError) { gateError.style.display = 'none'; gateError.innerText = "Incorrect passcode. Please try again."; }
       } catch (err) {
-        if (gateError) { 
-          gateError.style.display = 'block'; 
-          gateError.innerText = "Security database offline."; 
-        }
+        if (gateError) { gateError.style.display = 'block'; gateError.innerText = "Security database offline."; }
       }
     }
     fetchAccessDatabase();
@@ -448,26 +412,22 @@
     function unlockPortal() {
       const passInput = document.getElementById('gatePass');
       const input = passInput ? passInput.value.trim().toLowerCase() : "";
-      
       if (userDatabase[input]) {
         authorizedUser = userDatabase[input];
+        document.getElementById('passwordGate').style.display = 'none';
+        document.getElementById('appContent').style.display = 'flex';
+        signOutBtn.style.display = 'block';
         
-        triggerCinematicDissolve(() => {
-          document.getElementById('passwordGate').style.display = 'none';
-          document.getElementById('appContent').style.display = 'flex';
-          signOutBtn.style.display = 'block';
-          
-          if (Hls.isSupported()) {
-            hlsInstance = new Hls();
-            hlsInstance.loadSource(BUNNY_HLS_URL);
-            hlsInstance.attachMedia(refVideo);
-          } else if (refVideo.canPlayType('application/vnd.apple.mpegurl')) {
-            refVideo.src = BUNNY_HLS_URL;
-          }
-          boundThumbnailsToFixedLayer();
-          startWatermarkEngine();
-          initCamera();
-        });
+        if (Hls.isSupported()) {
+          hlsInstance = new Hls();
+          hlsInstance.loadSource(BUNNY_HLS_URL);
+          hlsInstance.attachMedia(refVideo);
+        } else if (refVideo.canPlayType('application/vnd.apple.mpegurl')) {
+          refVideo.src = BUNNY_HLS_URL;
+        }
+        boundThumbnailsToFixedLayer();
+        startWatermarkEngine();
+        initCamera();
       } else {
         if (gateError) gateError.style.display = 'block';
         if (passInput) passInput.value = '';
@@ -476,9 +436,9 @@
 
     function handleSignOut() {
       cleanupIsolatedAudioPipeline();
-      clearInterval(loopInterval);
-      clearTimeout(zoomFadeTimeout);
-      if (watermarkTimer) clearInterval(watermarkTimer);
+      if (loopInterval) { clearInterval(loopInterval); loopInterval = null; }
+      if (zoomFadeTimeout) { clearTimeout(zoomFadeTimeout); zoomFadeTimeout = null; }
+      if (watermarkTimer) { clearInterval(watermarkTimer); watermarkTimer = null; }
       if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
       if (liveStream) liveStream.getTracks().forEach(track => track.stop());
       if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
@@ -516,6 +476,7 @@
       watermarkEl.style.display = 'block';
       const moveWatermark = () => {
         const container = refVideo.parentElement;
+        if (!container) return;
         const maxX = container.clientWidth - watermarkEl.clientWidth - 24;
         const maxY = container.clientHeight - watermarkEl.clientHeight - 24;
         const randomX = Math.max(12, Math.floor(Math.random() * maxX));
@@ -573,7 +534,7 @@
 
     actionBtn.addEventListener('click', () => {
       if (!isRecordingMode && !isReviewMode) {
-        triggerCinematicDissolve(startCountdown);
+        startCountdown();
       } else if (isRecordingMode) {
         stopRecordingSession();
       } else if (isReviewMode) {
@@ -647,9 +608,7 @@
       }
 
       mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
-      mediaRecorder.onstop = () => {
-        triggerCinematicDissolve(compileSessionData);
-      };
+      mediaRecorder.onstop = () => { compileSessionData(); };
 
       refVideo.play();
       mediaRecorder.start(10);
@@ -663,6 +622,7 @@
       }
     }
 
+    // Isolated mobile-hardened Web Audio pipeline rendering architecture
     function initIsolatedAudioPipeline() {
       if (webAudioContext) return;
       try {
@@ -799,7 +759,7 @@
       }
 
       if (webAudioContext && webAudioContext.state === 'suspended') {
-        webAudioContext.resume();
+        webAudioContext.resume().catch(()=>{});
       }
 
       const isCurrentlyMuted = muteReviewBtn.classList.contains('is-muted');
@@ -817,7 +777,7 @@
 
     function playBoth() {
       if (webAudioContext && webAudioContext.state === 'suspended') {
-        webAudioContext.resume();
+        webAudioContext.resume().catch(()=>{});
       }
       isReviewPlaying = true;
       viewfinder.play().catch(()=>{});
@@ -844,13 +804,13 @@
         }, 4000);
       } else {
         resetBtn.classList.remove('danger-active');
-        triggerCinematicDissolve(executeSystemReset);
+        executeSystemReset();
       }
     });
 
     function executeSystemReset() {
       cleanupIsolatedAudioPipeline();
-      clearInterval(loopInterval);
+      if (loopInterval) { clearInterval(loopInterval); loopInterval = null; }
       refVideo.removeEventListener('ended', handleVideoTrackFinished);
       
       refVideo.pause();
