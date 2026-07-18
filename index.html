@@ -743,7 +743,12 @@
       muteReviewBtn.classList.add('is-muted');
 
       reviewPlayer.onloadedmetadata = () => {
-        const recordedDuration = reviewPlayer.duration || 0;
+        let recordedDuration = reviewPlayer.duration;
+        
+        if (recordedDuration === Infinity || recordedDuration === 0 || isNaN(recordedDuration)) {
+          recordedDuration = 0;
+        }
+        
         scrubSlider.max = recordedDuration;
         scrubSlider.value = 0;
         updateTimeDisplayLabel(0);
@@ -755,7 +760,10 @@
       };
 
       reviewPlayer.onprogress = () => {
-        if (reviewPlayer.duration && scrubSlider.max !== reviewPlayer.duration) {
+        const validDuration = reviewPlayer.duration && isFinite(reviewPlayer.duration) && reviewPlayer.duration > 0;
+        const sliderMaxSet = parseFloat(scrubSlider.max);
+        
+        if (validDuration && (sliderMaxSet === 0 || Math.abs(scrubSlider.max - reviewPlayer.duration) > 0.1)) {
           scrubSlider.max = reviewPlayer.duration;
         }
       };
