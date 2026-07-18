@@ -3,12 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V27.5)</title>
+  <title>Sync Performance Review (V27.6)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&amp;display=swap" rel="stylesheet">
   
-  <!-- Include Hls.js for seamless streaming on native video elements -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
 
   <style>
@@ -149,13 +148,13 @@
       .mute-btn-container button { width: 80px !important; height: 26px !important; }
     }
     .box { position: relative; width: 100%; flex: 1 1 0%; height: 0; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
-    .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; }
+    .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; background: #000; }
     
     video { 
       width: 100%; 
       height: 100%; 
       object-fit: cover; 
-      background: transparent; 
+      background: #000; 
       transition: transform 0.1s ease-out; 
       transform-origin: center center; 
       -webkit-touch-callout: none;
@@ -179,19 +178,14 @@
     }
     .viewfinder-overlay.hidden { display: none !important; }
 
-    /* Forcing the Reference Video Container to exactly match the Overlay thumbnail structural properties */
     #refVideoContainer {
       width: 100%;
       height: 100%;
       position: relative;
-      background-image: url('https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg');
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
+      background: #000;
       overflow: hidden;
     }
     
-    video[poster] { object-fit: cover; }
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 2px; }
     #refLabel { background: rgba(46, 125, 50, 0.7); } 
     #streamLabel { background: rgba(139, 0, 0, 0.7); } 
@@ -292,7 +286,6 @@
     </div>
   </div>
 
-  <!-- PERSISTENT LEFT SIGN-OUT BUTTON -->
   <button id="signOutBtn" onclick="handleSignOut()">Sign Out</button>
 
   <!-- MAIN APP CONTAINER -->
@@ -302,6 +295,7 @@
         <div class="label" id="refLabel">REFERENCE LESSON</div>
         
         <div id="refVideoContainer">
+          <!-- Explicit poster configuration directly handling matching properties -->
           <video id="refVideo" 
                  poster="https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg" 
                  preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
@@ -345,7 +339,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V27.5</div>
+      <div class="version-tag">V27.6</div>
     </div>
   </div>
 
@@ -358,6 +352,11 @@
     let authorizedUser = "";
     let watermarkTimer = null;
     let hlsInstance = null;
+
+    // Web Audio Isolated Node Context Variables
+    let webAudioContext = null;
+    let webAudioSourceNode = null;
+    let webAudioGainNode = null;
 
     const refVideo = document.getElementById('refVideo');
     const gateError = document.getElementById('gateError');
@@ -434,6 +433,7 @@
     }
 
     function handleSignOut() {
+      cleanupIsolatedAudioPipeline();
       clearInterval(loopInterval);
       clearTimeout(zoomFadeTimeout);
       if (watermarkTimer) clearInterval(watermarkTimer);
@@ -612,6 +612,33 @@
       }
     }
 
+    function initIsolatedAudioPipeline() {
+      if (webAudioContext) return;
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        webAudioContext = new AudioContextClass();
+        webAudioSourceNode = webAudioContext.createMediaElementSource(viewfinder);
+        webAudioGainNode = webAudioContext.createGain();
+        
+        webAudioSourceNode.connect(webAudioGainNode);
+        webAudioGainNode.connect(webAudioContext.destination);
+        
+        // Ensure element itself stays unmuted so telemetry frames flow down
+        viewfinder.muted = false;
+        // Drive attenuation safely using Web Audio gain stage to block video element clock stuttering
+        webAudioGainNode.gain.setValueAtTime(0, webAudioContext.currentTime);
+      } catch (e) {
+        viewfinder.muted = true;
+      }
+    }
+
+    function cleanupIsolatedAudioPipeline() {
+      if (webAudioContext) {
+        try { webAudioContext.close(); } catch(e){}
+        webAudioContext = null; webAudioSourceNode = null; webAudioGainNode = null;
+      }
+    }
+
     function compileSessionData() {
       currentVideoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
       const videoURL = URL.createObjectURL(currentVideoBlob);
@@ -634,7 +661,7 @@
       viewfinder.src = videoURL;
       viewfinder.controls = false;
       
-      viewfinder.muted = true;
+      initIsolatedAudioPipeline();
       muteReviewBtn.innerText = "Muted";
       muteReviewBtn.classList.add('is-muted');
 
@@ -717,32 +744,33 @@
     });
 
     muteReviewBtn.addEventListener('click', () => {
-      viewfinder.muted = !viewfinder.muted;
-      if (viewfinder.muted) {
-        muteReviewBtn.innerText = "Muted";
-        muteReviewBtn.classList.add('is-muted');
-      } else {
+      if (!webAudioContext || !webAudioGainNode) {
+        initIsolatedAudioPipeline();
+      }
+
+      if (webAudioContext && webAudioContext.state === 'suspended') {
+        webAudioContext.resume();
+      }
+
+      const isCurrentlyMuted = muteReviewBtn.classList.contains('is-muted');
+      
+      if (isCurrentlyMuted) {
+        // Unmute: Ramp Web Audio Gain node to 1.0 safely without resetting elements mid-flight
+        if (webAudioGainNode) webAudioGainNode.gain.setValueAtTime(1.0, webAudioContext.currentTime);
         muteReviewBtn.innerText = "Unmuted";
         muteReviewBtn.classList.remove('is-muted');
-        
-        // Mobile-optimized hardware alignment patch
-        if (isReviewPlaying) {
-          viewfinder.pause();
-          refVideo.pause();
-          viewfinder.currentTime = refVideo.currentTime;
-          
-          const executionDelay = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ? 80 : 40;
-          setTimeout(() => {
-            if (isReviewPlaying) {
-              viewfinder.play().catch(()=>{});
-              refVideo.play().catch(()=>{});
-            }
-          }, executionDelay);
-        }
+      } else {
+        // Mute: Drop Web Audio gain target down to 0
+        if (webAudioGainNode) webAudioGainNode.gain.setValueAtTime(0.0, webAudioContext.currentTime);
+        muteReviewBtn.innerText = "Muted";
+        muteReviewBtn.classList.add('is-muted');
       }
     });
 
     function playBoth() {
+      if (webAudioContext && webAudioContext.state === 'suspended') {
+        webAudioContext.resume();
+      }
       isReviewPlaying = true;
       viewfinder.play().catch(()=>{});
       refVideo.play().catch(()=>{});
@@ -773,6 +801,7 @@
     });
 
     function executeSystemReset() {
+      cleanupIsolatedAudioPipeline();
       clearInterval(loopInterval);
       refVideo.removeEventListener('ended', handleVideoTrackFinished);
       
