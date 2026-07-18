@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V26.5)</title>
+  <title>Sync Performance Review (V27.0)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&amp;display=swap" rel="stylesheet">
@@ -99,7 +99,7 @@
     }
     .gate-error { color: #ff453a; font-size: 12px; margin-top: 10px; display: none; }
 
-    /* --- V26.1 SIGN-OUT BUTTON --- */
+    /* --- V27.0 SIGN-OUT BUTTON --- */
     #signOutBtn {
       position: fixed;
       left: 0;
@@ -163,7 +163,6 @@
       user-select: none;
     }
     
-    /* Updated Overlay: Linked directly to your primary video asset thumbnail framework */
     .viewfinder-overlay {
       position: absolute;
       inset: 0;
@@ -317,7 +316,7 @@
     <div class="timeline-footer" id="masterTimeline">
       <input type="range" id="scrubSlider" class="timeline-slider" min="0" max="100" step="0.1" value="0">
       <div class="time-display" id="timeLabel">0:00</div>
-      <div class="mute-btn-container"><button class="mute-btn" id="muteReviewBtn">Muted</button></div>
+      <div class="mute-btn-container"><button class="mute-btn is-muted" id="muteReviewBtn">Muted</button></div>
     </div>
     
     <div class="controls-footer">
@@ -337,7 +336,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V26.1</div>
+      <div class="version-tag">V27.0</div>
     </div>
   </div>
 
@@ -375,7 +374,7 @@
     const scrubSlider = document.getElementById('scrubSlider');
     const timeLabel = document.getElementById('timeLabel');
 
-    let mediaRecorder = null, recordedChunks = [], liveStream = null, isRecordingMode = false, isReviewMode = false, loopInterval = null, isUserScrubbing = false, zoomFadeTimeout = null, chosenScale = 1, currentVideoBlob = null, isSeeking = false;
+    let mediaRecorder = null, recordedChunks = [], liveStream = null, isRecordingMode = false, isReviewMode = false, isReviewPlaying = false, loopInterval = null, isUserScrubbing = false, zoomFadeTimeout = null, chosenScale = 1, currentVideoBlob = null, isSeeking = false;
     let overlayActive = true; 
     const PRE_RECORD_ALIGN_TIME = 20;
 
@@ -428,7 +427,7 @@
       if (liveStream) liveStream.getTracks().forEach(track => track.stop());
       if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
       
-      isRecordingMode = false; isReviewMode = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1;
+      isRecordingMode = false; isReviewMode = false; isReviewPlaying = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1;
       refVideo.pause(); refVideo.removeAttribute('src'); refVideo.load();
       viewfinder.srcObject = null; viewfinder.src = "";
       watermarkEl.style.display = 'none'; signOutBtn.style.display = 'none';
@@ -506,14 +505,13 @@
       }
     });
 
-    // --- WORKING RUNTIME ORCHESTRATION ENGINE ---
     actionBtn.addEventListener('click', () => {
       if (!isRecordingMode && !isReviewMode) {
         startCountdown();
       } else if (isRecordingMode) {
         stopRecordingSession();
       } else if (isReviewMode) {
-        if (refVideo.paused) { playBoth(); } else { pauseBoth(); }
+        if (!isReviewPlaying) { playBoth(); } else { pauseBoth(); }
       }
     });
 
@@ -553,12 +551,15 @@
       resetBtn.style.display = "block";
       resetBtn.disabled = true;
 
-      // Handle custom or standard browser container compatibility safely
-      let options = { mimeType: 'video/webm;codecs=vp9,opus' };
+      // Prioritize native MP4 container formatting over WebM formats
+      let options = { mimeType: 'video/mp4;codecs=avc1,mp4a.40.2' };
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options = { mimeType: 'video/webm;codecs=vp8,opus' };
+        options = { mimeType: 'video/mp4' };
         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-          options = { mimeType: 'video/mp4' };
+          options = { mimeType: 'video/webm;codecs=vp9,opus' };
+          if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options = { mimeType: 'video/webm;codecs=vp8,opus' };
+          }
         }
       }
 
@@ -583,11 +584,12 @@
     }
 
     function compileSessionData() {
-      currentVideoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
+      currentVideoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
       const videoURL = URL.createObjectURL(currentVideoBlob);
       
       isRecordingMode = false;
       isReviewMode = true;
+      isReviewPlaying = false;
       
       recBadge.style.display = "none";
       zoomUi.style.display = "none";
@@ -601,10 +603,11 @@
       viewfinder.srcObject = null;
       viewfinder.src = videoURL;
       viewfinder.controls = false;
-      viewfinder.muted = false;
       
-      muteReviewBtn.innerText = "Unmuted";
-      muteReviewBtn.classList.remove('is-muted');
+      // Set recorded playback video window to muted by default
+      viewfinder.muted = true;
+      muteReviewBtn.innerText = "Muted";
+      muteReviewBtn.classList.add('is-muted');
 
       actionBtn.innerText = "Play Review";
       actionBtn.className = "custom-png-btn";
@@ -613,7 +616,6 @@
       downloadBtn.style.display = "block";
       masterTimeline.classList.add('show');
 
-      // Initialize Sync Heartbeat Engine
       refVideo.currentTime = 0;
       viewfinder.currentTime = 0;
       
@@ -631,6 +633,23 @@
     function synchronizeClocks() {
       if (isUserScrubbing || isSeeking) return;
 
+      // Handle continuous loop synchronization once the recorded clip concludes
+      if (viewfinder.ended || refVideo.ended || (viewfinder.duration && viewfinder.currentTime >= viewfinder.duration)) {
+        refVideo.currentTime = 0;
+        viewfinder.currentTime = 0;
+        if (isReviewPlaying) {
+          refVideo.play().catch(()=>{});
+          viewfinder.play().catch(()=>{});
+        } else {
+          refVideo.pause();
+          viewfinder.pause();
+        }
+        return;
+      }
+
+      // Stop synchronization calculation checks if the user has not clicked Play yet
+      if (!isReviewPlaying) return;
+
       if (Math.abs(viewfinder.currentTime - refVideo.currentTime) > 0.15) {
         if (!viewfinder.seeking && !refVideo.seeking) {
           isSeeking = true;
@@ -641,12 +660,6 @@
 
       scrubSlider.value = refVideo.currentTime;
       updateTimeLabel(refVideo.currentTime);
-
-      if (refVideo.ended) {
-        pauseBoth();
-        refVideo.currentTime = 0;
-        viewfinder.currentTime = 0;
-      }
     }
 
     function updateTimeLabel(time) {
@@ -655,7 +668,6 @@
       timeLabel.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
 
-    // --- TIMELINE CONTROLS & INTERACTION ---
     scrubSlider.addEventListener('input', () => {
       isUserScrubbing = true;
       const targetTime = parseFloat(scrubSlider.value);
@@ -680,18 +692,19 @@
     });
 
     function playBoth() {
+      isReviewPlaying = true;
       viewfinder.play().catch(()=>{});
       refVideo.play().catch(()=>{});
       actionBtn.innerText = "Pause Review";
     }
 
     function pauseBoth() {
+      isReviewPlaying = false;
       viewfinder.pause();
       refVideo.pause();
       actionBtn.innerText = "Play Review";
     }
 
-    // --- RESET MANAGEMENT ---
     resetBtn.addEventListener('click', () => {
       if (!resetBtn.classList.contains('danger-active')) {
         resetBtn.classList.add('danger-active');
@@ -708,8 +721,14 @@
 
     function executeSystemReset() {
       clearInterval(loopInterval);
+      
+      // Stop and cleanly reset the reference layout engines immediately
+      refVideo.pause();
+      refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
+      
       isReviewMode = false;
       isRecordingMode = false;
+      isReviewPlaying = false;
       recordedChunks = [];
       currentVideoBlob = null;
 
@@ -742,7 +761,8 @@
       const url = URL.createObjectURL(currentVideoBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Performance_Review_${new Date().toISOString().slice(0,10)}.webm`;
+      // Exports cleanly under structural MP4 file extension configurations
+      a.download = `Performance_Review_${new Date().toISOString().slice(0,10)}.mp4`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
