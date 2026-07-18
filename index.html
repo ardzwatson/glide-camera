@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V26.4)</title>
+  <title>Sync Performance Review (V26.5)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&amp;display=swap" rel="stylesheet">
@@ -135,7 +135,7 @@
       height: 100%;
     }
 
-    /* --- ORIGINAL STYLES --- */
+    /* --- CONTAINER & WINDOW CONFIGURATION --- */
     .container { display: flex; flex-direction: column; gap: 12px; width: 100%; flex-grow: 1; min-height: 0; }
     @media (orientation: landscape) {
       body, html { padding: env(safe-area-inset-top, 4px) 8px calc(env(safe-area-inset-bottom, 0px) + 4px) 8px; }
@@ -163,10 +163,11 @@
       user-select: none;
     }
     
+    /* Updated Overlay: Linked directly to your primary video asset thumbnail framework */
     .viewfinder-overlay {
       position: absolute;
       inset: 0;
-      background-image: url('https://res.cloudinary.com/dgz4sxuj5/video/upload/so_20/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.jpg');
+      background-image: url('https://vz-1e14ed9f-aa1.b-cdn.net/9f8c72d1-0f86-42bd-b1e3-951c41e4b151/thumbnail.jpg');
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
@@ -205,8 +206,8 @@
     .time-display { font-family: 'Marcellus', serif; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
     
     .mute-btn-container { display: flex; align-items: center; justify-content: center; }
-    .mute-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; border: none; width: 90px; height: 32px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); background-color: #444; border-radius: 6px; background-image: url('images/audio-on.png'); }
-    .mute-btn.is-muted { background-color: #ff453a; background-image: url('images/audio-muted.png'); }
+    .mute-btn { font-family: 'Marcellus', serif; border: none; width: 90px; height: 32px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); background-color: #444; border-radius: 6px; }
+    .mute-btn.is-muted { background-color: #ff453a; }
     
     .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
     
@@ -214,21 +215,19 @@
       opacity: 0.85;
       transition: opacity 0.2s ease, transform 0.1s ease, filter 0.2s;
     }
-    button.custom-png-btn:hover, .custom-select-ui:hover {
-      opacity: 1.0;
-    }
+    button.custom-png-btn:hover, .custom-select-ui:hover { opacity: 1.0; }
     
-    button.custom-png-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: transparent; border: none; width: 130px; height: 44px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; }
+    button.custom-png-btn { font-family: 'Marcellus', serif; background-color: transparent; border: none; width: 130px; height: 44px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; }
     button.custom-png-btn:active { transform: scale(0.96); filter: brightness(0.85); }
     button.custom-png-btn:disabled { filter: grayscale(1) opacity(0.4); cursor: not-allowed; transform: none; }
     
-    #actionBtn { background-color: #007aff; border-radius: 8px; background-image: url('images/start-btn.png'); }
-    #actionBtn.btn-recording { background-color: #ff453a !important; background-image: url('images/stop-btn.png') !important; }
+    #actionBtn { background-color: #007aff; border-radius: 8px; }
+    #actionBtn.btn-recording { background-color: #ff453a !important; }
     
-    #resetBtn { background-color: #8e8e93; border-radius: 8px; background-image: url('images/reset-btn.png'); display: none; }
-    #resetBtn.danger-active { background-color: #ff3b30; background-image: url('images/clear-btn.png'); }
+    #resetBtn { background-color: #8e8e93; border-radius: 8px; display: none; }
+    #resetBtn.danger-active { background-color: #ff3b30; }
     
-    #overlayToggleBtn { background-color: #e5e5ea; color: #1c1c1e; border-radius: 8px; text-shadow: none; background-image: url('images/overlay-btn.png'); }
+    #overlayToggleBtn { background-color: #e5e5ea; color: #1c1c1e; border-radius: 8px; text-shadow: none; }
     #overlayToggleBtn.overlay-off { background-color: #444 !important; color: white !important; opacity: 0.7; }
     
     .custom-select-ui {
@@ -249,14 +248,13 @@
     .custom-select-ui.hidden { display: none !important; }
     .custom-select-ui:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    #downloadBtn { background-color: #34c759; border-radius: 8px; background-image: url('images/save-btn.png'); display: none; }
+    #downloadBtn { background-color: #34c759; border-radius: 8px; display: none; }
     .version-tag { color: #556; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: 'Marcellus', serif; position: absolute; right: 4px; }
     .countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: #fff; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
     .countdown-overlay.show { opacity: 1; }
     .rec-indicator { position: absolute; top: 12px; right: 12px; background: #ff3b30; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; animation: pulse 1s infinite alternate; display: none; z-index: 10; }
     @keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
 
-    /* Moving Watermark & Security Warn Overlays */
     #videoWatermark {
       position: absolute;
       pointer-events: none;
@@ -273,24 +271,6 @@
       user-select: none;
       -webkit-user-select: none;
     }
-    #securityWarning {
-      position: absolute;
-      inset: 0;
-      background: rgba(10, 10, 10, 0.97);
-      z-index: 999;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      color: #ff453a;
-      padding: 20px;
-      box-sizing: border-box;
-    }
-    #securityWarning h2 { font-size: 26px; margin: 0 0 10px 0; font-weight: 800; letter-spacing: 1px; }
-    #securityWarning p { color: #fff; max-width: 320px; font-size: 14px; line-height: 1.4; margin: 0 0 20px 0; }
-    #securityWarning button { font-family: 'Marcellus', serif; padding: 10px 24px; background: #2c2c2e; border: 1px solid #3a3a3c; color: white; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-    #securityWarning button:active { background: #3a3a3c; }
   </style>
 </head>
 <body>
@@ -309,27 +289,17 @@
   <!-- PERSISTENT LEFT SIGN-OUT BUTTON -->
   <button id="signOutBtn" onclick="handleSignOut()">Sign Out</button>
 
-  <!-- MAIN APP CONTAINER (Hidden initially) -->
+  <!-- MAIN APP CONTAINER -->
   <div id="appContent">
     <div class="container">
       <div class="box" id="videoBox" style="position: relative;">
         <div class="label" id="refLabel">REFERENCE LESSON</div>
         
-        <!-- Reference Video with default thumbnail fallback -->
         <video id="refVideo" 
-               poster="https://res.cloudinary.com/dgz4sxuj5/video/upload/so_20/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.jpg" 
+               poster="https://vz-1e14ed9f-aa1.b-cdn.net/9f8c72d1-0f86-42bd-b1e3-951c41e4b151/thumbnail.jpg" 
                preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
         
-        <!-- Floating Watermark -->
         <div id="videoWatermark"></div>
-
-        <!-- Security Notice Shield -->
-        <div id="securityWarning">
-          <h2>SECURITY NOTICE</h2>
-          <p>Environment focus lost or screen capture attempt detected. Media playback has been suspended.</p>
-          <button onclick="dismissWarning()">Resume View</button>
-        </div>
-
         <div class="countdown-overlay" id="countdown">3</div>
       </div>
       
@@ -372,19 +342,17 @@
   </div>
 
   <script>
-    // --- DATABASE & VARIABLE SYNC ---
     const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1fxQrloklFsVMvy1-hf5kouhH1w0N_gaPy26uA5jT7S8/gviz/tq?tqx=out:csv";
     const BUNNY_HLS_URL = "https://vz-1e14ed9f-aa1.b-cdn.net/9f8c72d1-0f86-42bd-b1e3-951c41e4b151/playlist.m3u8";
     
     let userDatabase = {}; 
     let authorizedUser = "";
     let watermarkTimer = null;
-    let hlsInstance = null; // Track HLS stream reference
+    let hlsInstance = null;
 
     const refVideo = document.getElementById('refVideo');
     const gateError = document.getElementById('gateError');
     const watermarkEl = document.getElementById('videoWatermark');
-    const warningEl = document.getElementById('securityWarning');
     const signOutBtn = document.getElementById('signOutBtn');
 
     const viewfinder = document.getElementById('viewfinder');
@@ -411,58 +379,39 @@
     let overlayActive = true; 
     const PRE_RECORD_ALIGN_TIME = 20;
 
-    // --- 1. ACCESS KEY SYNC ENGINE (GOOGLE SHEETS) ---
     async function fetchAccessDatabase() {
       try {
         const response = await fetch(GOOGLE_SHEET_CSV_URL);
         if (!response.ok) throw new Error("Database sync failed");
-        
         const csvText = await response.text();
         const lines = csvText.split(/\r?\n/);
-        
         lines.forEach(line => {
           const columns = line.split(',').map(col => col.replace(/^"|"$/g, '').trim());
-          if (columns[0] && columns[1]) {
-            userDatabase[columns[0].toLowerCase()] = columns[1];
-          }
+          if (columns[0] && columns[1]) userDatabase[columns[0].toLowerCase()] = columns[1];
         });
-        
-        if (gateError) {
-          gateError.style.display = 'none';
-          gateError.innerText = "Incorrect passcode. Please try again.";
-        }
+        if (gateError) { gateError.style.display = 'none'; gateError.innerText = "Incorrect passcode. Please try again."; }
       } catch (err) {
-        console.error("Critical database synchronization failure:", err);
-        if (gateError) {
-          gateError.style.display = 'block';
-          gateError.innerText = "Security database offline. Check connection.";
-        }
+        if (gateError) { gateError.style.display = 'block'; gateError.innerText = "Security database offline."; }
       }
     }
     fetchAccessDatabase();
 
-    // --- 2. AUTHENTICATION & SIGN-OUT CONTROLLERS ---
     function unlockPortal() {
       const passInput = document.getElementById('gatePass');
       const input = passInput ? passInput.value.trim().toLowerCase() : "";
-      
       if (userDatabase[input]) {
         authorizedUser = userDatabase[input];
-        
         document.getElementById('passwordGate').style.display = 'none';
         document.getElementById('appContent').style.display = 'flex';
         signOutBtn.style.display = 'block';
         
-        // Dynamic Bunny.net Stream HLS Injection Engine
         if (Hls.isSupported()) {
           hlsInstance = new Hls();
           hlsInstance.loadSource(BUNNY_HLS_URL);
           hlsInstance.attachMedia(refVideo);
         } else if (refVideo.canPlayType('application/vnd.apple.mpegurl')) {
-          // Native Safari fallback support
           refVideo.src = BUNNY_HLS_URL;
         }
-        
         startWatermarkEngine();
         initCamera();
       } else {
@@ -475,127 +424,52 @@
       clearInterval(loopInterval);
       clearTimeout(zoomFadeTimeout);
       if (watermarkTimer) clearInterval(watermarkTimer);
+      if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+      if (liveStream) liveStream.getTracks().forEach(track => track.stop());
+      if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
       
-      if (mediaRecorder && mediaRecorder.state !== "inactive") {
-        mediaRecorder.stop();
-      }
-      
-      if (liveStream) {
-        liveStream.getTracks().forEach(track => track.stop());
-      }
-      
-      // Destroy active dynamic HLS instances gracefully
-      if (hlsInstance) {
-        hlsInstance.destroy();
-        hlsInstance = null;
-      }
-      
-      isRecordingMode = false;
-      isReviewMode = false;
-      recordedChunks = [];
-      currentVideoBlob = null;
-      chosenScale = 1;
-      
-      refVideo.pause();
-      refVideo.removeAttribute('src');
-      refVideo.load();
-      
-      viewfinder.srcObject = null;
-      viewfinder.src = "";
-      
-      watermarkEl.style.display = 'none';
-      warningEl.style.display = 'none';
-      signOutBtn.style.display = 'none';
-      
+      isRecordingMode = false; isReviewMode = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1;
+      refVideo.pause(); refVideo.removeAttribute('src'); refVideo.load();
+      viewfinder.srcObject = null; viewfinder.src = "";
+      watermarkEl.style.display = 'none'; signOutBtn.style.display = 'none';
       document.getElementById('appContent').style.display = 'none';
       
-      viewfinder.muted = true;
-      muteReviewBtn.innerText = "Muted";
-      muteReviewBtn.classList.add('is-muted');
-      masterTimeline.classList.remove('show');
-      downloadBtn.style.display = "none";
-      
-      zoomSlider.value = 1;
-      zoomLabel.innerText = "1.0x";
-      viewfinder.style.transform = "scale(1)";
-      cameraOverlay.style.transform = "scale(1)";
-      zoomUi.style.display = "flex";
-      recBadge.style.display = "none";
-      streamLabel.classList.remove('review-active');
+      viewfinder.muted = true; muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
+      masterTimeline.classList.remove('show'); downloadBtn.style.display = "none";
+      zoomSlider.value = 1; zoomLabel.innerText = "1.0x"; viewfinder.style.transform = "scale(1)"; cameraOverlay.style.transform = "scale(1)";
+      zoomUi.style.display = "flex"; recBadge.style.display = "none"; streamLabel.classList.remove('review-active');
       streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
       
-      overlayToggleBtn.disabled = false;
-      opacitySelector.disabled = false;
-      overlayActive = true;
-      cameraOverlay.classList.remove('hidden');
-      opacitySelector.classList.remove('hidden');
-      
-      actionBtn.innerText = "Start Session";
-      actionBtn.className = "custom-png-btn";
-      actionBtn.disabled = false;
-      
-      resetBtn.innerText = "Reset / Clear";
-      resetBtn.disabled = true;
-      resetBtn.style.display = "none";
-      
-      const passInput = document.getElementById('gatePass');
-      if (passInput) passInput.value = '';
+      overlayToggleBtn.disabled = false; opacitySelector.disabled = false; overlayActive = true;
+      cameraOverlay.classList.remove('hidden'); opacitySelector.classList.remove('hidden');
+      actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
+      resetBtn.innerText = "Reset / Clear"; resetBtn.disabled = true; resetBtn.style.display = "none";
+      const passInput = document.getElementById('gatePass'); if (passInput) passInput.value = '';
       document.getElementById('passwordGate').style.display = 'flex';
     }
 
-    document.getElementById('gatePass').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') unlockPortal();
-    });
+    document.getElementById('gatePass').addEventListener('keypress', function(e) { if (e.key === 'Enter') unlockPortal(); });
 
-    // --- 3. HARDENED WATERMARK ENGINE ---
     function startWatermarkEngine() {
       watermarkEl.innerText = `${authorizedUser} • DRAFT PREVIEW`;
       watermarkEl.style.display = 'block';
-      
       const moveWatermark = () => {
         const container = refVideo.parentElement;
         const maxX = container.clientWidth - watermarkEl.clientWidth - 24;
         const maxY = container.clientHeight - watermarkEl.clientHeight - 24;
-        
         const randomX = Math.max(12, Math.floor(Math.random() * maxX));
         const randomY = Math.max(12, Math.floor(Math.random() * maxY));
-        
-        watermarkEl.style.left = `${randomX}px`;
-        watermarkEl.style.top = `${randomY}px`;
+        watermarkEl.style.left = `${randomX}px`; watermarkEl.style.top = `${randomY}px`;
       };
-      
-      moveWatermark();
-      watermarkTimer = setInterval(moveWatermark, 4500);
+      moveWatermark(); watermarkTimer = setInterval(moveWatermark, 4500);
     }
 
-    // --- 4. SECURE ISOLATION SHIELD (GAZE DISCONNECTED IN V26.1) ---
-    window.addEventListener('blur', () => {
-      console.log("V26.1 Update: Tab/Window blur event captured. Gaze alert bypassed.");
-    });
-
-    function triggerSecurityBreach() {}
-    function dismissWarning() { warningEl.style.display = 'none'; }
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'PrintScreen') { e.preventDefault(); }
-    });
-
-    refVideo.addEventListener('contextmenu', (e) => e.preventDefault());
-
-    // --- 5. SYSTEM CAMERA CORE ---
     async function initCamera() {
       try { 
-        liveStream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 360 } }, 
-          audio: true 
-        }); 
+        liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 360 } }, audio: true }); 
         viewfinder.srcObject = liveStream; 
-        resetZoomFadeTimer(); 
-        setupInitialState(); 
-      } catch (err) { 
-        console.warn("Camera access could not be acquired automatically:", err); 
-        setupInitialState(); 
-      }
+        resetZoomFadeTimer(); setupInitialState(); 
+      } catch (err) { setupInitialState(); }
     }
     
     function setupInitialState() {
@@ -608,19 +482,15 @@
     
     function resetZoomFadeTimer() {
       if (isReviewMode) return;
-      zoomUi.classList.remove('fade-out');
-      clearTimeout(zoomFadeTimeout);
+      zoomUi.classList.remove('fade-out'); clearTimeout(zoomFadeTimeout);
       zoomFadeTimeout = setTimeout(() => { if (!isReviewMode) zoomUi.classList.add('fade-out'); }, 3000);
     }
     cameraBox.addEventListener('mousemove', resetZoomFadeTimer);
     cameraBox.addEventListener('touchstart', resetZoomFadeTimer);
     
     zoomSlider.addEventListener('input', (e) => { 
-      chosenScale = parseFloat(e.target.value); 
-      zoomLabel.innerText = `${chosenScale.toFixed(1)}x`; 
-      viewfinder.style.transform = `scale(${chosenScale})`; 
-      cameraOverlay.style.transform = `scale(${chosenScale})`; 
-      resetZoomFadeTimer(); 
+      chosenScale = parseFloat(e.target.value); zoomLabel.innerText = `${chosenScale.toFixed(1)}x`; 
+      viewfinder.style.transform = `scale(${chosenScale})`; cameraOverlay.style.transform = `scale(${chosenScale})`; resetZoomFadeTimer(); 
     });
     opacitySelector.addEventListener('change', (e) => { cameraOverlay.style.opacity = e.target.value; });
     
@@ -628,31 +498,257 @@
       if (isReviewMode) return;
       overlayActive = !overlayActive;
       if (overlayActive) { 
-        cameraOverlay.classList.remove('hidden'); 
-        opacitySelector.classList.remove('hidden'); 
-        overlayToggleBtn.innerText = "Overlay On"; 
-        overlayToggleBtn.classList.remove('overlay-off'); 
+        cameraOverlay.classList.remove('hidden'); opacitySelector.classList.remove('hidden'); 
+        overlayToggleBtn.innerText = "Overlay On"; overlayToggleBtn.classList.remove('overlay-off'); 
       } else { 
-        cameraOverlay.classList.add('hidden'); 
-        opacitySelector.classList.add('hidden'); 
-        overlayToggleBtn.innerText = "Overlay Off"; 
-        overlayToggleBtn.classList.add('overlay-off'); 
+        cameraOverlay.classList.add('hidden'); opacitySelector.classList.add('hidden'); 
+        overlayToggleBtn.innerText = "Overlay Off"; overlayToggleBtn.classList.add('overlay-off'); 
       }
     });
 
-    actionBtn.addEventListener('click', () => { 
-      if (!isRecordingMode && !isReviewMode) { 
-        // Sync custom countdown or recording triggers here
-      } else if (isRecordingMode) { 
-        // Stop session logic
-      } else if (isReviewMode) { 
-        if (refVideo.paused) { playBoth(); } else { pauseBoth(); } 
-      } 
+    // --- WORKING RUNTIME ORCHESTRATION ENGINE ---
+    actionBtn.addEventListener('click', () => {
+      if (!isRecordingMode && !isReviewMode) {
+        startCountdown();
+      } else if (isRecordingMode) {
+        stopRecordingSession();
+      } else if (isReviewMode) {
+        if (refVideo.paused) { playBoth(); } else { pauseBoth(); }
+      }
     });
 
-    function playBoth() { viewfinder.play(); refVideo.play(); actionBtn.innerText = "Pause Review"; }
-    function shadowPause() { viewfinder.pause(); refVideo.pause(); }
-    function pauseBoth() { shadowPause(); actionBtn.innerText = "Play Review"; }
+    function startCountdown() {
+      actionBtn.disabled = true;
+      resetBtn.disabled = true;
+      let count = 3;
+      countdown.innerText = count;
+      countdown.classList.add('show');
+      
+      refVideo.currentTime = 0;
+      refVideo.pause();
+
+      const interval = setInterval(() => {
+        count--;
+        if (count > 0) {
+          countdown.innerText = count;
+        } else {
+          clearInterval(interval);
+          countdown.classList.remove('show');
+          startRecordingSession();
+        }
+      }, 1000);
+    }
+
+    function startRecordingSession() {
+      isRecordingMode = true;
+      recordedChunks = [];
+      
+      recBadge.style.display = "block";
+      refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
+      
+      actionBtn.innerText = "Stop Session";
+      actionBtn.className = "custom-png-btn btn-recording";
+      actionBtn.disabled = false;
+      
+      resetBtn.style.display = "block";
+      resetBtn.disabled = true;
+
+      // Handle custom or standard browser container compatibility safely
+      let options = { mimeType: 'video/webm;codecs=vp9,opus' };
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options = { mimeType: 'video/webm;codecs=vp8,opus' };
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+          options = { mimeType: 'video/mp4' };
+        }
+      }
+
+      try {
+        mediaRecorder = new MediaRecorder(liveStream, options);
+      } catch (e) {
+        mediaRecorder = new MediaRecorder(liveStream);
+      }
+
+      mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
+      mediaRecorder.onstop = compileSessionData;
+
+      refVideo.play();
+      mediaRecorder.start(10);
+    }
+
+    function stopRecordingSession() {
+      refVideo.pause();
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+      }
+    }
+
+    function compileSessionData() {
+      currentVideoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
+      const videoURL = URL.createObjectURL(currentVideoBlob);
+      
+      isRecordingMode = false;
+      isReviewMode = true;
+      
+      recBadge.style.display = "none";
+      zoomUi.style.display = "none";
+      cameraOverlay.classList.add('hidden');
+      opacitySelector.classList.add('hidden');
+      overlayToggleBtn.disabled = true;
+      
+      streamLabel.classList.add('review-active');
+      streamLabel.innerHTML = `<span>YOUR RECORDED PERFORMANCE</span>`;
+      
+      viewfinder.srcObject = null;
+      viewfinder.src = videoURL;
+      viewfinder.controls = false;
+      viewfinder.muted = false;
+      
+      muteReviewBtn.innerText = "Unmuted";
+      muteReviewBtn.classList.remove('is-muted');
+
+      actionBtn.innerText = "Play Review";
+      actionBtn.className = "custom-png-btn";
+      
+      resetBtn.disabled = false;
+      downloadBtn.style.display = "block";
+      masterTimeline.classList.add('show');
+
+      // Initialize Sync Heartbeat Engine
+      refVideo.currentTime = 0;
+      viewfinder.currentTime = 0;
+      
+      refVideo.addEventListener('loadedmetadata', setupTimelineUI, { once: true });
+      setupTimelineUI();
+
+      loopInterval = setInterval(synchronizeClocks, 15);
+    }
+
+    function setupTimelineUI() {
+      scrubSlider.max = refVideo.duration || 100;
+      scrubSlider.value = 0;
+    }
+
+    function synchronizeClocks() {
+      if (isUserScrubbing || isSeeking) return;
+
+      if (Math.abs(viewfinder.currentTime - refVideo.currentTime) > 0.15) {
+        if (!viewfinder.seeking && !refVideo.seeking) {
+          isSeeking = true;
+          viewfinder.currentTime = refVideo.currentTime;
+          setTimeout(() => { isSeeking = false; }, 50);
+        }
+      }
+
+      scrubSlider.value = refVideo.currentTime;
+      updateTimeLabel(refVideo.currentTime);
+
+      if (refVideo.ended) {
+        pauseBoth();
+        refVideo.currentTime = 0;
+        viewfinder.currentTime = 0;
+      }
+    }
+
+    function updateTimeLabel(time) {
+      const mins = Math.floor(time / 60);
+      const secs = Math.floor(time % 60);
+      timeLabel.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    // --- TIMELINE CONTROLS & INTERACTION ---
+    scrubSlider.addEventListener('input', () => {
+      isUserScrubbing = true;
+      const targetTime = parseFloat(scrubSlider.value);
+      refVideo.currentTime = targetTime;
+      viewfinder.currentTime = targetTime;
+      updateTimeLabel(targetTime);
+    });
+
+    scrubSlider.addEventListener('change', () => {
+      isUserScrubbing = false;
+    });
+
+    muteReviewBtn.addEventListener('click', () => {
+      viewfinder.muted = !viewfinder.muted;
+      if (viewfinder.muted) {
+        muteReviewBtn.innerText = "Muted";
+        muteReviewBtn.classList.add('is-muted');
+      } else {
+        muteReviewBtn.innerText = "Unmuted";
+        muteReviewBtn.classList.remove('is-muted');
+      }
+    });
+
+    function playBoth() {
+      viewfinder.play().catch(()=>{});
+      refVideo.play().catch(()=>{});
+      actionBtn.innerText = "Pause Review";
+    }
+
+    function pauseBoth() {
+      viewfinder.pause();
+      refVideo.pause();
+      actionBtn.innerText = "Play Review";
+    }
+
+    // --- RESET MANAGEMENT ---
+    resetBtn.addEventListener('click', () => {
+      if (!resetBtn.classList.contains('danger-active')) {
+        resetBtn.classList.add('danger-active');
+        resetBtn.innerText = "Confirm Reset?";
+        setTimeout(() => {
+          resetBtn.classList.remove('danger-active');
+          if (isReviewMode) resetBtn.innerText = "Reset / Clear";
+        }, 3000);
+      } else {
+        resetBtn.classList.remove('danger-active');
+        executeSystemReset();
+      }
+    });
+
+    function executeSystemReset() {
+      clearInterval(loopInterval);
+      isReviewMode = false;
+      isRecordingMode = false;
+      recordedChunks = [];
+      currentVideoBlob = null;
+
+      viewfinder.src = "";
+      viewfinder.srcObject = liveStream;
+      viewfinder.muted = true;
+      
+      muteReviewBtn.innerText = "Muted";
+      muteReviewBtn.classList.add('is-muted');
+      masterTimeline.classList.remove('show');
+      downloadBtn.style.display = "none";
+      
+      streamLabel.classList.remove('review-active');
+      streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
+      
+      overlayToggleBtn.disabled = false;
+      opacitySelector.disabled = false;
+      if (overlayActive) { cameraOverlay.classList.remove('hidden'); opacitySelector.classList.remove('hidden'); }
+      
+      actionBtn.innerText = "Start Session";
+      actionBtn.className = "custom-png-btn";
+      resetBtn.style.display = "none";
+      resetBtn.disabled = true;
+
+      setupInitialState();
+    }
+
+    downloadBtn.addEventListener('click', () => {
+      if (!currentVideoBlob) return;
+      const url = URL.createObjectURL(currentVideoBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Performance_Review_${new Date().toISOString().slice(0,10)}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+
+    refVideo.addEventListener('contextmenu', (e) => e.preventDefault());
   </script>
 </body>
 </html>
