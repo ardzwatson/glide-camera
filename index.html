@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V27.0)</title>
+  <title>Sync Performance Review (V27.1)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&amp;display=swap" rel="stylesheet">
@@ -163,10 +163,11 @@
       user-select: none;
     }
     
+    /* Updated Overlay: Aligned with your new Bunny Video thumbnail framework */
     .viewfinder-overlay {
       position: absolute;
       inset: 0;
-      background-image: url('https://vz-1e14ed9f-aa1.b-cdn.net/9f8c72d1-0f86-42bd-b1e3-951c41e4b151/thumbnail.jpg');
+      background-image: url('https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg');
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
@@ -294,8 +295,9 @@
       <div class="box" id="videoBox" style="position: relative;">
         <div class="label" id="refLabel">REFERENCE LESSON</div>
         
+        <!-- Updated Reference Poster: Linked to your new Bunny framework -->
         <video id="refVideo" 
-               poster="https://vz-1e14ed9f-aa1.b-cdn.net/9f8c72d1-0f86-42bd-b1e3-951c41e4b151/thumbnail.jpg" 
+               poster="https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg" 
                preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
         
         <div id="videoWatermark"></div>
@@ -342,7 +344,8 @@
 
   <script>
     const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1fxQrloklFsVMvy1-hf5kouhH1w0N_gaPy26uA5jT7S8/gviz/tq?tqx=out:csv";
-    const BUNNY_HLS_URL = "https://vz-1e14ed9f-aa1.b-cdn.net/9f8c72d1-0f86-42bd-b1e3-951c41e4b151/playlist.m3u8";
+    // Target modern Bunny asset framework hash reference
+    const BUNNY_HLS_URL = "https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/playlist.m3u8";
     
     let userDatabase = {}; 
     let authorizedUser = "";
@@ -442,7 +445,7 @@
       overlayToggleBtn.disabled = false; opacitySelector.disabled = false; overlayActive = true;
       cameraOverlay.classList.remove('hidden'); opacitySelector.classList.remove('hidden');
       actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
-      resetBtn.innerText = "Reset / Clear"; resetBtn.disabled = true; resetBtn.style.display = "none";
+      resetBtn.innerText = "Reset / Clear"; resetBtn.disabled = true; resetBtn.style.display = "none"; resetBtn.classList.remove('danger-active');
       const passInput = document.getElementById('gatePass'); if (passInput) passInput.value = '';
       document.getElementById('passwordGate').style.display = 'flex';
     }
@@ -548,17 +551,20 @@
       actionBtn.className = "custom-png-btn btn-recording";
       actionBtn.disabled = false;
       
-      resetBtn.style.display = "block";
+      resetBtn.style.display = "none";
       resetBtn.disabled = true;
 
-      // Prioritize native MP4 container formatting over WebM formats
+      // Prioritize full video and audio MP4 container parameters
       let options = { mimeType: 'video/mp4;codecs=avc1,mp4a.40.2' };
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options = { mimeType: 'video/mp4' };
+        options = { mimeType: 'video/mp4;codecs=avc1,opus' };
         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-          options = { mimeType: 'video/webm;codecs=vp9,opus' };
+          options = { mimeType: 'video/mp4' };
           if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-            options = { mimeType: 'video/webm;codecs=vp8,opus' };
+            options = { mimeType: 'video/webm;codecs=vp9,opus', audio: true };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+              options = { mimeType: 'video/webm;codecs=vp8,opus', audio: true };
+            }
           }
         }
       }
@@ -604,7 +610,7 @@
       viewfinder.src = videoURL;
       viewfinder.controls = false;
       
-      // Set recorded playback video window to muted by default
+      // Explicitly mute playback window by default on load
       viewfinder.muted = true;
       muteReviewBtn.innerText = "Muted";
       muteReviewBtn.classList.add('is-muted');
@@ -612,16 +618,25 @@
       actionBtn.innerText = "Play Review";
       actionBtn.className = "custom-png-btn";
       
+      // Reveal standard state Reset/Clear switch cleanly
+      resetBtn.innerText = "Reset / Clear";
+      resetBtn.className = "custom-png-btn";
       resetBtn.disabled = false;
+      resetBtn.style.display = "block";
+      
       downloadBtn.style.display = "block";
       masterTimeline.classList.add('show');
 
+      // Keep videos clean and strictly paused on frame zero on load
+      refVideo.pause();
+      viewfinder.pause();
       refVideo.currentTime = 0;
       viewfinder.currentTime = 0;
       
       refVideo.addEventListener('loadedmetadata', setupTimelineUI, { once: true });
       setupTimelineUI();
 
+      if (loopInterval) clearInterval(loopInterval);
       loopInterval = setInterval(synchronizeClocks, 15);
     }
 
@@ -633,7 +648,7 @@
     function synchronizeClocks() {
       if (isUserScrubbing || isSeeking) return;
 
-      // Handle continuous loop synchronization once the recorded clip concludes
+      // Handle custom continuous clip synchronization cleanly without autplaying
       if (viewfinder.ended || refVideo.ended || (viewfinder.duration && viewfinder.currentTime >= viewfinder.duration)) {
         refVideo.currentTime = 0;
         viewfinder.currentTime = 0;
@@ -647,7 +662,7 @@
         return;
       }
 
-      // Stop synchronization calculation checks if the user has not clicked Play yet
+      // Stop synchronization calculation loops if the player is cleanly stopped
       if (!isReviewPlaying) return;
 
       if (Math.abs(viewfinder.currentTime - refVideo.currentTime) > 0.15) {
@@ -705,15 +720,20 @@
       actionBtn.innerText = "Play Review";
     }
 
+    // --- RESET MANAGEMENT SYSTEM ---
     resetBtn.addEventListener('click', () => {
       if (!resetBtn.classList.contains('danger-active')) {
+        // Step 1: User clicks "Reset / Clear" -> UI toggles confirmation state
         resetBtn.classList.add('danger-active');
         resetBtn.innerText = "Confirm Reset?";
         setTimeout(() => {
-          resetBtn.classList.remove('danger-active');
-          if (isReviewMode) resetBtn.innerText = "Reset / Clear";
-        }, 3000);
+          if (resetBtn.classList.contains('danger-active')) {
+            resetBtn.classList.remove('danger-active');
+            resetBtn.innerText = "Reset / Clear";
+          }
+        }, 4000);
       } else {
+        // Step 2: Confirmation state is active and user clicks -> trigger complete system teardown
         resetBtn.classList.remove('danger-active');
         executeSystemReset();
       }
@@ -722,8 +742,9 @@
     function executeSystemReset() {
       clearInterval(loopInterval);
       
-      // Stop and cleanly reset the reference layout engines immediately
+      // Force stop layout windows immediately
       refVideo.pause();
+      viewfinder.pause();
       refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
       
       isReviewMode = false;
@@ -750,6 +771,9 @@
       
       actionBtn.innerText = "Start Session";
       actionBtn.className = "custom-png-btn";
+      
+      // Cleanly reset structural display flags on conclusion
+      resetBtn.innerText = "Reset / Clear";
       resetBtn.style.display = "none";
       resetBtn.disabled = true;
 
@@ -761,7 +785,6 @@
       const url = URL.createObjectURL(currentVideoBlob);
       const a = document.createElement('a');
       a.href = url;
-      // Exports cleanly under structural MP4 file extension configurations
       a.download = `Performance_Review_${new Date().toISOString().slice(0,10)}.mp4`;
       document.body.appendChild(a);
       a.click();
