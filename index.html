@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V29.1)</title>
+  <title>Sync Performance Review (V29.2)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&amp;display=swap" rel="stylesheet">
@@ -160,7 +160,16 @@
       -webkit-touch-callout: none;
       user-select: none;
       z-index: 2;
-      position: relative;
+    }
+
+    /* Multi-track visibility styling to stop tracking canvas dropout */
+    .video-track {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      display: none;
+    }
+    .video-track.active-view {
+      display: block !important;
     }
     
     .viewfinder-overlay {
@@ -311,7 +320,9 @@
         <div class="label" id="streamLabel"><span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span></div>
         <div class="rec-indicator" id="recBadge">● RECORDING</div>
         <div class="viewfinder-container">
-          <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
+          <!-- Separated elements isolate live camera initialization vs playback file streaming -->
+          <video id="viewfinder" class="video-track active-view" autoplay playsinline webkit-playsinline muted></video>
+          <video id="reviewPlayer" class="video-track" playsinline webkit-playsinline></video>
           <div id="cameraOverlay" class="viewfinder-overlay"></div>
         </div>
         <div class="zoom-container" id="zoomUi"><input type="range" id="zoomSlider" class="zoom-slider" min="1" max="2" step="0.1" value="1"><label id="zoomLabel">1.0x</label></div>
@@ -342,7 +353,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V29.1</div>
+      <div class="version-tag">V29.2</div>
     </div>
   </div>
 
@@ -366,6 +377,7 @@
     const signOutBtn = document.getElementById('signOutBtn');
 
     const viewfinder = document.getElementById('viewfinder');
+    const reviewPlayer = document.getElementById('reviewPlayer');
     const cameraOverlay = document.getElementById('cameraOverlay');
     const actionBtn = document.getElementById('actionBtn');
     const previewRefBtn = document.getElementById('previewRefBtn');
@@ -451,11 +463,22 @@
       
       isRecordingMode = false; isReviewMode = false; isReviewPlaying = false; isPreviewingRef = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1; isSeeking = false;
       refVideo.pause(); refVideo.removeAttribute('src'); refVideo.setAttribute('poster', THUMBNAIL_ASSET); refVideo.load();
-      viewfinder.pause(); removeVideoEndedListener(); viewfinder.srcObject = null; viewfinder.src = "";
+      
+      viewfinder.pause(); 
+      viewfinder.srcObject = null;
+      reviewPlayer.pause();
+      removeVideoEndedListener();
+      reviewPlayer.removeAttribute('src');
+      reviewPlayer.load();
+
+      // Reset views visibility safely
+      reviewPlayer.classList.remove('active-view');
+      viewfinder.classList.add('active-view');
+
       watermarkEl.style.display = 'none'; signOutBtn.style.display = 'none';
       document.getElementById('appContent').style.display = 'none';
       
-      viewfinder.muted = true; muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
+      reviewPlayer.muted = true; muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
       masterTimeline.classList.remove('show'); downloadBtn.style.display = "none";
       zoomSlider.value = 1; zoomLabel.innerText = "1.0x"; viewfinder.style.transform = "scale(1)";
       zoomUi.style.display = "flex"; recBadge.style.display = "none"; streamLabel.classList.remove('review-active');
@@ -697,16 +720,18 @@
       refVideo.pause();
       refVideo.currentTime = 0;
 
-      viewfinder.srcObject = null;
+      // Toggle views instantly without rebuilding hardware stream profiles
+      viewfinder.classList.remove('active-view');
+      reviewPlayer.classList.add('active-view');
+
       const playbackUrl = URL.createObjectURL(currentVideoBlob);
-      viewfinder.src = playbackUrl;
-      viewfinder.load();
+      reviewPlayer.src = playbackUrl;
+      reviewPlayer.load();
       
-      viewfinder.muted = false;
-      viewfinder.style.transform = "scale(1)";
+      reviewPlayer.muted = false;
 
       try {
-        setupIsolatedAudioPipeline(viewfinder);
+        setupIsolatedAudioPipeline(reviewPlayer);
         if (webAudioGainNode) webAudioGainNode.gain.setValueAtTime(0, webAudioContext.currentTime);
         if (webAudioContext && webAudioContext.state !== 'suspended') {
           webAudioContext.suspend();
@@ -716,21 +741,21 @@
       muteReviewBtn.innerText = "Muted";
       muteReviewBtn.classList.add('is-muted');
 
-      viewfinder.onloadedmetadata = () => {
-        const recordedDuration = viewfinder.duration || 0;
+      reviewPlayer.onloadedmetadata = () => {
+        const recordedDuration = reviewPlayer.duration || 0;
         scrubSlider.max = recordedDuration;
         scrubSlider.value = 0;
         updateTimeDisplayLabel(0);
         masterTimeline.classList.add('show');
         
-        viewfinder.pause();
+        reviewPlayer.pause();
         refVideo.currentTime = 0;
         refVideo.pause();
       };
 
-      viewfinder.onprogress = () => {
-        if (viewfinder.duration && scrubSlider.max !== viewfinder.duration) {
-          scrubSlider.max = viewfinder.duration;
+      reviewPlayer.onprogress = () => {
+        if (reviewPlayer.duration && scrubSlider.max !== reviewPlayer.duration) {
+          scrubSlider.max = reviewPlayer.duration;
         }
       };
 
@@ -783,20 +808,20 @@
         webAudioContext.resume();
       }
 
-      const targetTime = viewfinder.currentTime;
+      const targetTime = reviewPlayer.currentTime;
       refVideo.currentTime = targetTime;
 
       refVideo.play().then(() => {
-        return viewfinder.play();
+        return reviewPlayer.play();
       }).catch(() => {
-        viewfinder.play().catch(() => {});
+        reviewPlayer.play().catch(() => {});
       });
     }
 
     function pauseBoth() {
       isReviewPlaying = false;
       actionBtn.innerText = "Play Review";
-      viewfinder.pause();
+      reviewPlayer.pause();
       refVideo.pause();
       
       if (webAudioContext && webAudioContext.state === 'running') {
@@ -804,11 +829,10 @@
       }
     }
 
-    // Native loop handling explicitly eliminates requestAnimationFrame alignment logic delays on end-of-track cycles
     function handleReviewLoopSequence() {
       if (!isReviewMode) return;
       
-      viewfinder.currentTime = 0;
+      reviewPlayer.currentTime = 0;
       refVideo.currentTime = 0;
       scrubSlider.value = 0;
       updateTimeDisplayLabel(0);
@@ -819,19 +843,19 @@
         }
         
         refVideo.play().then(() => {
-          viewfinder.play().catch(() => {});
+          reviewPlayer.play().catch(() => {});
         }).catch(() => {
-          viewfinder.play().catch(() => {});
+          reviewPlayer.play().catch(() => {});
         });
       }
     }
 
     function addVideoEndedListener() {
-      viewfinder.addEventListener('ended', handleReviewLoopSequence);
+      reviewPlayer.addEventListener('ended', handleReviewLoopSequence);
     }
 
     function removeVideoEndedListener() {
-      viewfinder.removeEventListener('ended', handleReviewLoopSequence);
+      reviewPlayer.removeEventListener('ended', handleReviewLoopSequence);
     }
 
     function initializePerformanceReviewClock() {
@@ -844,9 +868,9 @@
         }
 
         if (isReviewPlaying && !isUserScrubbing && !isSeeking) {
-          const currentCamTime = viewfinder.currentTime;
+          const currentCamTime = reviewPlayer.currentTime;
           
-          if (Math.abs(refVideo.currentTime - currentCamTime) > 0.08) {
+          if (Math.abs(refVideo.currentTime - currentCamTime) > 0.06) {
             refVideo.currentTime = currentCamTime;
           }
 
@@ -866,6 +890,7 @@
       timeLabel.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
 
+    // Fixed slider interactions using synchronized layout-stable changes
     scrubSlider.addEventListener('input', () => {
       if (!isReviewMode) return;
       isUserScrubbing = true;
@@ -873,7 +898,7 @@
       const targetTime = parseFloat(scrubSlider.value);
       updateTimeDisplayLabel(targetTime);
       
-      viewfinder.currentTime = targetTime;
+      reviewPlayer.currentTime = targetTime;
       refVideo.currentTime = targetTime;
     });
 
@@ -891,16 +916,16 @@
             if (webAudioContext && webAudioContext.state === 'suspended' && !muteReviewBtn.classList.contains('is-muted')) {
               webAudioContext.resume();
             }
-            refVideo.play().then(() => viewfinder.play().catch(() => {})).catch(() => {});
+            refVideo.play().then(() => reviewPlayer.play().catch(() => {})).catch(() => {});
           }
         }
       };
 
-      viewfinder.fastSeek ? viewfinder.fastSeek(targetTime) : (viewfinder.currentTime = targetTime);
+      reviewPlayer.fastSeek ? reviewPlayer.fastSeek(targetTime) : (reviewPlayer.currentTime = targetTime);
       refVideo.fastSeek ? refVideo.fastSeek(targetTime) : (refVideo.currentTime = targetTime);
 
-      setTimeout(checkSeekDone, 50);
-      setTimeout(checkSeekDone, 50);
+      setTimeout(checkSeekDone, 40);
+      setTimeout(checkSeekDone, 40);
     });
 
     resetBtn.addEventListener('click', () => {
@@ -920,7 +945,7 @@
       }
     });
 
-    async function performFullSystemReset() {
+    function performFullSystemReset() {
       pauseBoth();
       cleanupIsolatedAudioPipeline();
       removeVideoEndedListener();
@@ -932,12 +957,14 @@
       recordedChunks = [];
       currentVideoBlob = null;
 
-      viewfinder.pause();
-      viewfinder.removeAttribute('src'); 
-      viewfinder.load();
+      // Unload playback track safely
+      reviewPlayer.pause();
+      reviewPlayer.removeAttribute('src'); 
+      reviewPlayer.load();
 
-      // Explicitly tear down and request a fresh live stream pointer down to hardware layers
-      await initCamera();
+      // Instantly switch display back to live viewfinder
+      reviewPlayer.classList.remove('active-view');
+      viewfinder.classList.add('active-view');
 
       masterTimeline.classList.remove('show');
       downloadBtn.style.display = "none";
