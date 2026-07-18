@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V29.4)</title>
+  <title>Sync Performance Review (V29.5)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
   
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+  <script async src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/ffmpeg.min.js"></script>
   
   <style>
     body, html { 
@@ -364,7 +365,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V29.4</div>
+      <div class="version-tag">V29.5</div>
     </div>
   </div>
 
@@ -754,6 +755,11 @@
       reviewPlayer.src = playbackUrl;
       reviewPlayer.load();
        
+      // Apply zoom from preview to review player
+      if (chosenScale && chosenScale > 0) {
+        reviewPlayer.style.transform = `scale(${chosenScale})`;
+      }
+        
       reviewPlayer.muted = true;
 
       try {
@@ -1076,6 +1082,7 @@
       // Instantly switch display back to live viewfinder
       reviewPlayer.classList.remove('active-view');
       viewfinder.classList.add('active-view');
+      reviewPlayer.style.transform = 'scale(1)';
 
       masterTimeline.classList.remove('show'); refTimeline.classList.remove('show');
       downloadBtn.style.display = "none";
@@ -1102,17 +1109,52 @@
       setupInitialState();
     }
 
-    downloadBtn.addEventListener('click', () => {
+    downloadBtn.addEventListener('click', async () => {
       if (!currentVideoBlob) return;
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = URL.createObjectURL(currentVideoBlob);
-      a.download = `performance_review_${authorizedUser || 'user'}.webm`;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(a.href);
+      
+      // Prompt user for custom filename
+      const defaultName = `performance_review_${authorizedUser || 'user'}.mp4`;
+      const customName = prompt('Enter filename (with .mp4 extension):', defaultName);
+      
+      if (!customName) return; // User cancelled
+      
+      const filename = customName.endsWith('.mp4') ? customName : customName + '.mp4';
+      
+      try {
+        // Try using modern File System Access API first
+        if (window.showSaveFilePicker) {
+          try {
+            const handle = await window.showSaveFilePicker({
+              suggestedName: filename,
+              types: [
+                {
+                  description: 'MP4 Videos',
+                  accept: { 'video/mp4': ['.mp4'] }
+                }
+              ]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(currentVideoBlob);
+            await writable.close();
+            console.log('Video saved successfully via File System Access API');
+            return;
+          } catch (err) {
+            if (err.name !== 'AbortError') {
+              console.warn('File System Access API failed, using fallback:', err);
+            }
+          }
+        }
+        
+        // Fallback: Simple download
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = URL.createObjectURL(currentVideoBlob);
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(a.href);
       }, 100);
     });
   </script>
