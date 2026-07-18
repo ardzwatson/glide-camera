@@ -6,7 +6,7 @@
   <title>Sync Performance Review (V29.2)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Marcellus&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
   
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
   
@@ -318,7 +318,7 @@
       
       <div class="box" id="cameraBox">
         <div class="label" id="streamLabel"><span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span></div>
-        <div class="rec-indicator" id="recBadge">● RECORDING</div>
+        <div class="rec-indicator" id="recBadge">●  RECORDING</div>
         <div class="viewfinder-container">
           <!-- Separated elements isolate live camera initialization vs playback file streaming -->
           <video id="viewfinder" class="video-track active-view" autoplay playsinline webkit-playsinline muted></video>
@@ -437,7 +437,8 @@
             enableWorker: true,
             lowLatencyMode: true,
             maxBufferLength: 30,
-            maxMaxBufferLength: 60,
+            maxMaxBufferLength: 600, // FIXED: Buffer retention increased
+            backBufferLength: 90,    // FIXED: Keeps back buffer in memory for looping
             appendErrorMaxRetry: 5
           });
           hlsInstance.loadSource(BUNNY_HLS_URL);
@@ -832,8 +833,9 @@
     function handleReviewLoopSequence() {
       if (!isReviewMode) return;
       
-      reviewPlayer.currentTime = 0;
-      refVideo.currentTime = 0;
+      // FIXED: Soft seek stabilizes the HLS buffer
+      reviewPlayer.currentTime = 0.1;
+      refVideo.currentTime = 0.1;
       scrubSlider.value = 0;
       updateTimeDisplayLabel(0);
       
@@ -870,7 +872,8 @@
         if (isReviewPlaying && !isUserScrubbing && !isSeeking) {
           const currentCamTime = reviewPlayer.currentTime;
           
-          if (Math.abs(refVideo.currentTime - currentCamTime) > 0.06) {
+          // FIXED: Relaxed threshold prevents continuous micro-seeking and stuttering
+          if (Math.abs(refVideo.currentTime - currentCamTime) > 0.25) {
             refVideo.currentTime = currentCamTime;
           }
 
