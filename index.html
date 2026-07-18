@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V27.3)</title>
+  <title>Sync Performance Review (V27.4)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&amp;display=swap" rel="stylesheet">
@@ -99,7 +99,6 @@
     }
     .gate-error { color: #ff453a; font-size: 12px; margin-top: 10px; display: none; }
 
-    /* --- SIGN-OUT BUTTON: Lowered alignment profile slightly --- */
     #signOutBtn {
       position: fixed;
       left: 0;
@@ -156,14 +155,15 @@
       width: 100%; 
       height: 100%; 
       object-fit: cover; 
-      background: #000; 
+      background: transparent; 
       transition: transform 0.1s ease-out; 
       transform-origin: center center; 
       -webkit-touch-callout: none;
       user-select: none;
+      z-index: 2;
+      position: relative;
     }
     
-    /* Overlay Layout: Fixed to background asset, isolated from sibling video transforms */
     .viewfinder-overlay {
       position: absolute;
       inset: 0;
@@ -179,10 +179,16 @@
     }
     .viewfinder-overlay.hidden { display: none !important; }
 
-    #refVideo {
+    /* Structural Background Layer Force-Matching Thumbnail Asset */
+    #refVideoContainer {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background-image: url('https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg');
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
+      overflow: hidden;
     }
     
     video[poster] { object-fit: cover; }
@@ -255,11 +261,12 @@
     .rec-indicator { position: absolute; top: 12px; right: 12px; background: #ff3b30; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; animation: pulse 1s infinite alternate; display: none; z-index: 10; }
     @keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
 
+    /* Watermark Optimization: Scale increased to 32px */
     #videoWatermark {
       position: absolute;
       pointer-events: none;
       color: rgba(255, 255, 255, 0.14);
-      font-size: 24px;
+      font-size: 32px;
       font-weight: bold;
       font-family: 'Marcellus', serif;
       text-transform: uppercase;
@@ -292,13 +299,14 @@
   <!-- MAIN APP CONTAINER -->
   <div id="appContent">
     <div class="container">
-      <div class="box" id="videoBox" style="position: relative;">
+      <div class="box" id="videoBox">
         <div class="label" id="refLabel">REFERENCE LESSON</div>
         
-        <!-- Persistent reference layout path target -->
-        <video id="refVideo" 
-               poster="https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg" 
-               preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
+        <div id="refVideoContainer">
+          <video id="refVideo" 
+                 poster="https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg" 
+                 preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
+        </div>
         
         <div id="videoWatermark"></div>
         <div class="countdown-overlay" id="countdown">3</div>
@@ -338,7 +346,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V27.3</div>
+      <div class="version-tag">V27.4</div>
     </div>
   </div>
 
@@ -381,7 +389,6 @@
     let overlayActive = true; 
     const PRE_RECORD_ALIGN_TIME = 20;
 
-    // Direct binding hooks to preserve visual fallback attributes through lifecycle initializations
     refVideo.addEventListener('loadstart', () => {
       if (!isRecordingMode && !isReviewMode) {
         refVideo.setAttribute('poster', THUMBNAIL_ASSET);
@@ -501,7 +508,6 @@
     cameraBox.addEventListener('mousemove', resetZoomFadeTimer);
     cameraBox.addEventListener('touchstart', resetZoomFadeTimer);
     
-    // Zoom transform target mapping modified to skip the structural overlay element cleanly
     zoomSlider.addEventListener('input', (e) => { 
       chosenScale = parseFloat(e.target.value); zoomLabel.innerText = `${chosenScale.toFixed(1)}x`; 
       viewfinder.style.transform = `scale(${chosenScale})`; resetZoomFadeTimer(); 
@@ -621,7 +627,6 @@
       zoomUi.style.display = "none";
       cameraOverlay.classList.add('hidden');
       
-      // Explicit contextual toggle: Hide structural overlay dashboard nodes completely
       overlayToggleBtn.classList.add('hidden');
       opacitySelector.classList.add('hidden');
       
@@ -652,43 +657,42 @@
       refVideo.currentTime = 0;
       viewfinder.currentTime = 0;
       
-      refVideo.addEventListener('loadedmetadata', setupTimelineUI, { once: true });
-      setupTimelineUI();
+      viewfinder.addEventListener('loadedmetadata', setupTimelineUI, { once: true });
+      if (viewfinder.duration) setupTimelineUI();
 
       if (loopInterval) clearInterval(loopInterval);
       loopInterval = setInterval(synchronizeClocks, 15);
     }
 
+    // Progress Bar length re-mapped dynamically to match recorded track scale duration
     function setupTimelineUI() {
-      scrubSlider.max = refVideo.duration || 100;
+      scrubSlider.max = viewfinder.duration || refVideo.duration || 100;
       scrubSlider.value = 0;
     }
 
     function synchronizeClocks() {
       if (isUserScrubbing || isSeeking) return;
 
+      const currentMaxDuration = viewfinder.duration || refVideo.duration;
+
+      // Handle loop boundaries and prevent buffer thread jitter
       if (viewfinder.ended || refVideo.ended || (viewfinder.duration && viewfinder.currentTime >= viewfinder.duration)) {
+        refVideo.pause();
+        viewfinder.pause();
         refVideo.currentTime = 0;
         viewfinder.currentTime = 0;
         
-        // Stabilize sequential loops: Hard sync audio pipeline vectors upon reset boundaries
-        if (!viewfinder.muted) {
-          viewfinder.muted = false; 
-        }
-
         if (isReviewPlaying) {
-          refVideo.play().catch(()=>{});
-          viewfinder.play().catch(()=>{});
-        } else {
-          refVideo.pause();
-          viewfinder.pause();
+          setTimeout(() => {
+            refVideo.play().catch(()=>{});
+            viewfinder.play().catch(()=>{});
+          }, 40);
         }
         return;
       }
 
       if (!isReviewPlaying) return;
 
-      // Tight alignment window check to eliminate buffer jitter
       if (Math.abs(viewfinder.currentTime - refVideo.currentTime) > 0.12) {
         if (!viewfinder.seeking && !refVideo.seeking) {
           isSeeking = true;
@@ -697,8 +701,8 @@
         }
       }
 
-      scrubSlider.value = refVideo.currentTime;
-      updateTimeLabel(refVideo.currentTime);
+      scrubSlider.value = viewfinder.currentTime;
+      updateTimeLabel(viewfinder.currentTime);
     }
 
     function updateTimeLabel(time) {
@@ -727,8 +731,19 @@
       } else {
         muteReviewBtn.innerText = "Unmuted";
         muteReviewBtn.classList.remove('is-muted');
-        // Instantly force an audio buffer sync point upon unmuting mid-flight
-        viewfinder.currentTime = refVideo.currentTime;
+        
+        // Anti-stutter mechanism: pause, sync audio pointers, clear thread queue, execute playback safely
+        if (isReviewPlaying) {
+          viewfinder.pause();
+          refVideo.pause();
+          viewfinder.currentTime = refVideo.currentTime;
+          setTimeout(() => {
+            if (isReviewPlaying) {
+              viewfinder.play().catch(()=>{});
+              refVideo.play().catch(()=>{});
+            }
+          }, 50);
+        }
       }
     });
 
@@ -790,7 +805,6 @@
       streamLabel.classList.remove('review-active');
       streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
       
-      // Structural Fix: Fully restore tracking options & buttons on execution loop reset
       zoomUi.style.display = "flex";
       zoomSlider.value = 1;
       zoomLabel.innerText = "1.0x";
