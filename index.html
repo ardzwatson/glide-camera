@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V27.7)</title>
+  <title>Sync Performance Review (V28.0)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&amp;display=swap" rel="stylesheet">
@@ -295,7 +295,6 @@
         <div class="label" id="refLabel">REFERENCE LESSON</div>
         
         <div id="refVideoContainer">
-          <!-- Explicit poster configuration directly handling matching properties -->
           <video id="refVideo" 
                  poster="https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg" 
                  preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
@@ -339,7 +338,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V27.7</div>
+      <div class="version-tag">V28.0</div>
     </div>
   </div>
 
@@ -353,7 +352,6 @@
     let watermarkTimer = null;
     let hlsInstance = null;
 
-    // Web Audio Isolated Node Context Variables
     let webAudioContext = null;
     let webAudioSourceNode = null;
     let webAudioGainNode = null;
@@ -383,7 +381,7 @@
     const scrubSlider = document.getElementById('scrubSlider');
     const timeLabel = document.getElementById('timeLabel');
 
-    let mediaRecorder = null, recordedChunks = [], liveStream = null, isRecordingMode = false, isReviewMode = false, isReviewPlaying = false, loopInterval = null, isUserScrubbing = false, zoomFadeTimeout = null, chosenScale = 1, currentVideoBlob = null, isSeeking = false;
+    let mediaRecorder = null, recordedChunks = [], liveStream = null, isRecordingMode = false, isReviewMode = false, isReviewPlaying = false, zoomFadeTimeout = null, isUserScrubbing = false, chosenScale = 1, currentVideoBlob = null, isSeeking = false;
     let overlayActive = true; 
     const PRE_RECORD_ALIGN_TIME = 20;
 
@@ -440,7 +438,6 @@
 
     function handleSignOut() {
       cleanupIsolatedAudioPipeline();
-      clearInterval(loopInterval);
       clearTimeout(zoomFadeTimeout);
       if (watermarkTimer) clearInterval(watermarkTimer);
       if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
@@ -500,6 +497,7 @@
         if (overlayActive) { cameraOverlay.classList.remove('hidden'); }
         overlayToggleBtn.classList.remove('hidden');
         opacitySelector.classList.remove('hidden');
+        masterTimeline.classList.remove('show');
       }
     }
     
@@ -584,6 +582,7 @@
       overlayToggleBtn.classList.add('hidden');
       opacitySelector.classList.add('hidden');
       cameraOverlay.classList.add('hidden');
+      masterTimeline.classList.remove('show');
 
       refVideo.addEventListener('ended', handleVideoTrackFinished);
 
@@ -650,8 +649,6 @@
       streamLabel.innerHTML = `<span>YOU (REVIEW PLAYBACK)</span>`;
       refLabel.innerHTML = `<span>REFERENCE LESSON (REVIEW PLAYBACK)</span>`;
 
-      // Crucial Fix: Ensure refVideo is completely frozen when entering review mode 
-      // instead of maintaining live rendering cycles or bleeding playheads.
       refVideo.pause();
       refVideo.currentTime = 0;
 
@@ -663,7 +660,6 @@
       viewfinder.muted = false;
       viewfinder.style.transform = "scale(1)";
 
-      // Setup clean isolated multi-node tracking pipeline
       try {
         setupIsolatedAudioPipeline(viewfinder);
         if (webAudioGainNode) webAudioGainNode.gain.setValueAtTime(0, webAudioContext.currentTime);
@@ -672,14 +668,22 @@
       muteReviewBtn.innerText = "Muted";
       muteReviewBtn.classList.add('is-muted');
 
+      // Dynamically map timeline parameters against the newly recorded track length
       viewfinder.onloadedmetadata = () => {
-        scrubSlider.max = viewfinder.duration || 100;
+        const recordedDuration = viewfinder.duration || 0;
+        scrubSlider.max = recordedDuration;
         scrubSlider.value = 0;
-        timeLabel.innerText = "0:00";
+        updateTimeDisplayLabel(0);
         masterTimeline.classList.add('show');
       };
 
-      // Ensure standard cross-thread frame clocks align securely
+      // Fallback fallback calculation layer if modern browser tags fail to surface
+      viewfinder.onprogress = () => {
+        if (viewfinder.duration && scrubSlider.max !== viewfinder.duration) {
+          scrubSlider.max = viewfinder.duration;
+        }
+      };
+
       initializePerformanceReviewClock();
     }
 
@@ -728,7 +732,6 @@
         webAudioContext.resume();
       }
 
-      // Synchronize playheads explicitly to eliminate thread delay issues
       const targetTime = viewfinder.currentTime;
       refVideo.currentTime = targetTime;
 
@@ -746,7 +749,6 @@
       refVideo.pause();
     }
 
-    // High Performance Frame Clocks Engine for Glitch Fixes (Timestamps 8s and 11s)
     function initializePerformanceReviewClock() {
       let activeAnimationFrameId = null;
 
@@ -759,7 +761,6 @@
         if (isReviewPlaying && !isUserScrubbing && !isSeeking) {
           const currentCamTime = viewfinder.currentTime;
           
-          // Double-check alignment check drift parameters dynamically
           if (Math.abs(refVideo.currentTime - currentCamTime) > 0.08) {
             refVideo.currentTime = currentCamTime;
           }
@@ -767,12 +768,18 @@
           scrubSlider.value = currentCamTime;
           updateTimeDisplayLabel(currentCamTime);
 
+          // Custom Review Looping Mechanics Architecture Integration
           if (viewfinder.ended || currentCamTime >= viewfinder.duration) {
-            pauseBoth();
             viewfinder.currentTime = 0;
             refVideo.currentTime = 0;
             scrubSlider.value = 0;
             updateTimeDisplayLabel(0);
+            
+            refVideo.play().then(() => {
+              viewfinder.play().catch(() => {});
+            }).catch(() => {
+              viewfinder.play().catch(() => {});
+            });
           }
         }
         activeAnimationFrameId = requestAnimationFrame(step);
@@ -788,7 +795,6 @@
       timeLabel.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
 
-    // Critical Scrub / Seek Synchronization Block to solve stuttering issues
     scrubSlider.addEventListener('input', () => {
       if (!isReviewMode) return;
       isUserScrubbing = true;
@@ -819,7 +825,6 @@
       viewfinder.fastSeek ? viewfinder.fastSeek(targetTime) : (viewfinder.currentTime = targetTime);
       refVideo.fastSeek ? refVideo.fastSeek(targetTime) : (refVideo.currentTime = targetTime);
 
-      // Using immediate resolution checkpoints instead of blocking event loop
       setTimeout(checkSeekDone, 50);
       setTimeout(checkSeekDone, 50);
     });
@@ -856,7 +861,6 @@
       viewfinder.muted = true;
       viewfinder.load();
 
-      // Recalibrate live hardware feed rendering metrics
       if (liveStream) {
         viewfinder.play().catch(() => {});
       }
