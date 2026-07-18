@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V29.2)</title>
+  <title>Sync Performance Review (V29.3)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -353,7 +353,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V29.2</div>
+      <div class="version-tag">V29.3</div>
     </div>
   </div>
 
@@ -796,14 +796,20 @@
         console.warn('AudioContext not available, using video muted property fallback');
         return false;
       }
-      
+       
       try {
         webAudioContext = new AudioContextClass();
         webAudioSourceNode = webAudioContext.createMediaElementSource(targetVideoElement);
         webAudioGainNode = webAudioContext.createGain();
-        
+         
         webAudioSourceNode.connect(webAudioGainNode);
         webAudioGainNode.connect(webAudioContext.destination);
+         
+        // Resume context immediately for better responsiveness
+        if (webAudioContext.state === 'suspended') {
+          webAudioContext.resume().catch(e => console.warn('Audio context resume failed:', e));
+        }
+         
         return true;
       } catch (e) {
         console.error('Audio pipeline setup failed:', e);
@@ -847,7 +853,7 @@
       if (!isReviewMode) return;
       isReviewPlaying = true;
       actionBtn.innerText = "Pause Review";
-      
+       
       if (webAudioContext && webAudioContext.state === 'suspended' && !muteReviewBtn.classList.contains('is-muted')) {
         webAudioContext.resume();
       }
@@ -855,11 +861,18 @@
       const targetTime = reviewPlayer.currentTime;
       refVideo.currentTime = targetTime;
 
-      refVideo.play().then(() => {
-        return reviewPlayer.play();
-      }).catch(() => {
-        reviewPlayer.play().catch(() => {});
-      });
+      const playPromises = [
+        refVideo.play().catch(e => console.warn('RefVideo play error:', e)),
+        reviewPlayer.play().catch(e => {
+          console.warn('ReviewPlayer play error:', e);
+          // Retry after a brief delay for full recordings
+          setTimeout(() => {
+            reviewPlayer.play().catch(err => console.error('ReviewPlayer retry failed:', err));
+          }, 100);
+        })
+      ];
+       
+      Promise.all(playPromises).catch(err => console.warn('Play errors:', err));
     }
 
     function pauseBoth() {
@@ -867,10 +880,9 @@
       actionBtn.innerText = "Play Review";
       reviewPlayer.pause();
       refVideo.pause();
-      
-      if (webAudioContext && webAudioContext.state === 'running') {
-        webAudioContext.suspend();
-      }
+       
+      // Don't suspend audio context immediately - user might resume playing
+      // Let it suspend naturally after playback ends
     }
 
     function handleReviewLoopSequence() {
