@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V27.6)</title>
+  <title>Sync Performance Review (V28.0)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&amp;display=swap" rel="stylesheet">
@@ -16,6 +16,39 @@
       font-family: 'Marcellus', -apple-system, BlinkMacSystemFont, serif; overflow: hidden; display: flex; flex-direction: column;
       padding: env(safe-area-inset-top, 8px) 12px calc(env(safe-area-inset-bottom, 0px) + 8px) 12px;
     }
+
+    /* --- CINEMATIC TSUSHIMA TRANSITION OVERLAY --- */
+    #tsushimaTransition {
+      position: fixed;
+      inset: 0;
+      background: transparent;
+      z-index: 99999;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .tsushima-flash {
+      position: absolute;
+      inset: 0;
+      background: white;
+      opacity: 0;
+      transition: opacity 0.15s ease-out;
+    }
+    .tsushima-ink {
+      position: absolute;
+      width: 150vmax;
+      height: 150vmax;
+      background: radial-gradient(circle, #050505 0%, #111 60%, transparent 100%);
+      border-radius: 50%;
+      transform: scale(0);
+      opacity: 0;
+      transition: transform 0.6s cubic-bezier(0.1, 0.8, 0.25, 1), opacity 0.4s ease;
+    }
+    
+    /* Animation Triggers */
+    #tsushimaTransition.flash-active .tsushima-flash { opacity: 0.95; }
+    #tsushimaTransition.ink-active .tsushima-ink { transform: scale(1); opacity: 1; }
 
     /* --- PASSWORD GATE STYLES --- */
     #passwordGate {
@@ -166,7 +199,6 @@
     .viewfinder-overlay {
       position: absolute;
       inset: 0;
-      background-image: url('https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg');
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
@@ -275,6 +307,12 @@
 </head>
 <body>
 
+  <!-- CINEMATIC TSUSHIMA TRANSITION ELEMENT -->
+  <div id="tsushimaTransition">
+    <div class="tsushima-flash"></div>
+    <div class="tsushima-ink"></div>
+  </div>
+
   <!-- PASSWORD GATE OVERLAY -->
   <div id="passwordGate">
     <div class="gate-card">
@@ -295,10 +333,7 @@
         <div class="label" id="refLabel">REFERENCE LESSON</div>
         
         <div id="refVideoContainer">
-          <!-- Explicit poster configuration directly handling matching properties -->
-          <video id="refVideo" 
-                 poster="https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg" 
-                 preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
+          <video id="refVideo" preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
         </div>
         
         <div id="videoWatermark"></div>
@@ -339,7 +374,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V27.6</div>
+      <div class="version-tag">V28.0</div>
     </div>
   </div>
 
@@ -353,7 +388,6 @@
     let watermarkTimer = null;
     let hlsInstance = null;
 
-    // Web Audio Isolated Node Context Variables
     let webAudioContext = null;
     let webAudioSourceNode = null;
     let webAudioGainNode = null;
@@ -362,6 +396,7 @@
     const gateError = document.getElementById('gateError');
     const watermarkEl = document.getElementById('videoWatermark');
     const signOutBtn = document.getElementById('signOutBtn');
+    const FX_TRANSITION = document.getElementById('tsushimaTransition');
 
     const viewfinder = document.getElementById('viewfinder');
     const cameraOverlay = document.getElementById('cameraOverlay');
@@ -387,9 +422,30 @@
     let overlayActive = true; 
     const PRE_RECORD_ALIGN_TIME = 20;
 
-    refVideo.addEventListener('loadstart', () => {
+    // Rigid Uniform Sync Strategy for Assets
+    function globallySynchronizeThumbnails() {
       refVideo.setAttribute('poster', THUMBNAIL_ASSET);
-    });
+      refVideo.poster = THUMBNAIL_ASSET;
+      cameraOverlay.style.backgroundImage = `url('${THUMBNAIL_ASSET}')`;
+    }
+    globallySynchronizeThumbnails();
+
+    refVideo.addEventListener('loadstart', globallySynchronizeThumbnails);
+
+    // Ghost of Tsushima Animated Style Transitions
+    function runTsushimaEffect(style, callback) {
+      if (style === 'flash') {
+        FX_TRANSITION.classList.add('flash-active');
+        setTimeout(() => { if(callback) callback(); }, 150);
+        setTimeout(() => { FX_TRANSITION.classList.remove('flash-active'); }, 350);
+      } else if (style === 'ink') {
+        FX_TRANSITION.classList.add('ink-active');
+        setTimeout(() => { if(callback) callback(); }, 400);
+        setTimeout(() => { FX_TRANSITION.classList.remove('ink-active'); }, 900);
+      } else {
+        if(callback) callback();
+      }
+    }
 
     async function fetchAccessDatabase() {
       try {
@@ -413,19 +469,23 @@
       const input = passInput ? passInput.value.trim().toLowerCase() : "";
       if (userDatabase[input]) {
         authorizedUser = userDatabase[input];
-        document.getElementById('passwordGate').style.display = 'none';
-        document.getElementById('appContent').style.display = 'flex';
-        signOutBtn.style.display = 'block';
         
-        if (Hls.isSupported()) {
-          hlsInstance = new Hls();
-          hlsInstance.loadSource(BUNNY_HLS_URL);
-          hlsInstance.attachMedia(refVideo);
-        } else if (refVideo.canPlayType('application/vnd.apple.mpegurl')) {
-          refVideo.src = BUNNY_HLS_URL;
-        }
-        startWatermarkEngine();
-        initCamera();
+        runTsushimaEffect('ink', () => {
+          document.getElementById('passwordGate').style.display = 'none';
+          document.getElementById('appContent').style.display = 'flex';
+          signOutBtn.style.display = 'block';
+          
+          if (Hls.isSupported()) {
+            hlsInstance = new Hls();
+            hlsInstance.loadSource(BUNNY_HLS_URL);
+            hlsInstance.attachMedia(refVideo);
+          } else if (refVideo.canPlayType('application/vnd.apple.mpegurl')) {
+            refVideo.src = BUNNY_HLS_URL;
+          }
+          globallySynchronizeThumbnails();
+          startWatermarkEngine();
+          initCamera();
+        });
       } else {
         if (gateError) gateError.style.display = 'block';
         if (passInput) passInput.value = '';
@@ -442,7 +502,9 @@
       if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
       
       isRecordingMode = false; isReviewMode = false; isReviewPlaying = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1;
-      refVideo.pause(); refVideo.removeAttribute('src'); refVideo.setAttribute('poster', THUMBNAIL_ASSET); refVideo.load();
+      refVideo.pause(); refVideo.removeAttribute('src'); 
+      globallySynchronizeThumbnails();
+      refVideo.load();
       viewfinder.srcObject = null; viewfinder.src = "";
       watermarkEl.style.display = 'none'; signOutBtn.style.display = 'none';
       document.getElementById('appContent').style.display = 'none';
@@ -489,7 +551,7 @@
     function setupInitialState() {
       if (!isReviewMode && !isRecordingMode) {
         refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
-        refVideo.setAttribute('poster', THUMBNAIL_ASSET);
+        globallySynchronizeThumbnails();
         refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing alignment framework (${PRE_RECORD_ALIGN_TIME}s)</span>`;
         if (overlayActive) { cameraOverlay.classList.remove('hidden'); }
         overlayToggleBtn.classList.remove('hidden');
@@ -525,7 +587,7 @@
 
     actionBtn.addEventListener('click', () => {
       if (!isRecordingMode && !isReviewMode) {
-        startCountdown();
+        runTsushimaEffect('flash', startCountdown);
       } else if (isRecordingMode) {
         stopRecordingSession();
       } else if (isReviewMode) {
@@ -598,7 +660,9 @@
       }
 
       mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
-      mediaRecorder.onstop = compileSessionData;
+      mediaRecorder.onstop = () => {
+        runTsushimaEffect('ink', compileSessionData);
+      };
 
       refVideo.play();
       mediaRecorder.start(10);
@@ -623,9 +687,7 @@
         webAudioSourceNode.connect(webAudioGainNode);
         webAudioGainNode.connect(webAudioContext.destination);
         
-        // Ensure element itself stays unmuted so telemetry frames flow down
         viewfinder.muted = false;
-        // Drive attenuation safely using Web Audio gain stage to block video element clock stuttering
         webAudioGainNode.gain.setValueAtTime(0, webAudioContext.currentTime);
       } catch (e) {
         viewfinder.muted = true;
@@ -755,12 +817,10 @@
       const isCurrentlyMuted = muteReviewBtn.classList.contains('is-muted');
       
       if (isCurrentlyMuted) {
-        // Unmute: Ramp Web Audio Gain node to 1.0 safely without resetting elements mid-flight
         if (webAudioGainNode) webAudioGainNode.gain.setValueAtTime(1.0, webAudioContext.currentTime);
         muteReviewBtn.innerText = "Unmuted";
         muteReviewBtn.classList.remove('is-muted');
       } else {
-        // Mute: Drop Web Audio gain target down to 0
         if (webAudioGainNode) webAudioGainNode.gain.setValueAtTime(0.0, webAudioContext.currentTime);
         muteReviewBtn.innerText = "Muted";
         muteReviewBtn.classList.add('is-muted');
@@ -796,7 +856,7 @@
         }, 4000);
       } else {
         resetBtn.classList.remove('danger-active');
-        executeSystemReset();
+        runTsushimaEffect('ink', executeSystemReset);
       }
     });
 
@@ -808,7 +868,7 @@
       refVideo.pause();
       viewfinder.pause();
       refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
-      refVideo.setAttribute('poster', THUMBNAIL_ASSET);
+      globallySynchronizeThumbnails();
       
       isReviewMode = false;
       isRecordingMode = false;
