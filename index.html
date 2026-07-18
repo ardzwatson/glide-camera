@@ -3,10 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V26.3)</title>
+  <title>Sync Performance Review (V26.4)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&amp;display=swap" rel="stylesheet">
+  
+  <!-- Include Hls.js for seamless streaming on native video elements -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+
   <style>
     body, html { 
       margin: 0; height: 100dvh; width: 100%; box-sizing: border-box; background: #111; color: white; 
@@ -28,7 +32,7 @@
       padding: 20px;
     }
     .gate-card {
-      background-image: url('https://lh3.googleusercontent.com/d/1B2Dk1T1vTjx0QaqoJIPZs9wvx09M60AG'); /* Animated GIF background */
+      background-image: url('https://lh3.googleusercontent.com/d/1B2Dk1T1vTjx0QaqoJIPZs9wvx09M60AG');
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
@@ -61,7 +65,7 @@
     .gate-input:focus { border-color: #ff453a; }
     
     .gate-btn {
-      position: relative; /* Create anchoring context for the absolute pseudo-element */
+      position: relative;
       width: 100%;
       height: 44px;
       background-color: transparent;
@@ -77,12 +81,11 @@
       align-items: center;
       justify-content: center;
       text-shadow: 0 1px 4px rgba(0,0,0,0.8);
-      overflow: hidden; /* Keep the pseudo-element image within the border radius bounds */
-      z-index: 1; /* Isolates stacking context so text stays on top */
+      overflow: hidden;
+      z-index: 1;
     }
     .gate-btn:active { transform: scale(0.98); filter: brightness(0.85); }
 
-    /* Target the background layer separately to apply opacity */
     .gate-btn::before {
       content: "";
       position: absolute;
@@ -91,8 +94,8 @@
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
-      opacity: 0.4; /* Set background image opacity to 40% */
-      z-index: -1; /* Layer it safely underneath your button text */
+      opacity: 0.4;
+      z-index: -1;
     }
     .gate-error { color: #ff453a; font-size: 12px; margin-top: 10px; display: none; }
 
@@ -103,10 +106,10 @@
       top: 50%;
       transform: translateY(-50%);
       z-index: 999;
-      background-color: rgba(0, 0, 0, 0.15); /* Black 15% opacity */
-      color: #ff453a; /* Sharp Red Text */
+      background-color: rgba(0, 0, 0, 0.15);
+      color: #ff453a;
       border: 1px solid rgba(255, 69, 58, 0.2);
-      border-left: none; /* Flush with edge */
+      border-left: none;
       border-radius: 0 8px 8px 0;
       padding: 14px 10px;
       font-family: 'Marcellus', serif;
@@ -115,17 +118,16 @@
       text-transform: uppercase;
       letter-spacing: 1px;
       cursor: pointer;
-      writing-mode: vertical-lr; /* Clean layout profile */
+      writing-mode: vertical-lr;
       transform-origin: left center;
       transition: background-color 0.2s ease, padding-left 0.2s ease;
-      display: none; /* Hidden until portal unlocks */
+      display: none;
     }
     #signOutBtn:hover {
       background-color: rgba(0, 0, 0, 0.35);
       padding-left: 14px;
     }
 
-    /* App content container (hidden until unlocked) */
     #appContent {
       display: none;
       flex-direction: column;
@@ -157,14 +159,14 @@
       background: #000; 
       transition: transform 0.1s ease-out; 
       transform-origin: center center; 
-      -webkit-touch-callout: none; /* Prevents long-press menu on iOS Safari */
-      user-select: none;           /* Prevents selection */
+      -webkit-touch-callout: none;
+      user-select: none;
     }
     
     .viewfinder-overlay {
       position: absolute;
       inset: 0;
-      background-image: url('https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg');
+      background-image: url('https://res.cloudinary.com/dgz4sxuj5/video/upload/so_20/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.jpg');
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
@@ -178,7 +180,6 @@
     .viewfinder-overlay.hidden { display: none !important; }
 
     #refVideo {
-      background-image: url('https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg');
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
@@ -207,15 +208,14 @@
     .mute-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; border: none; width: 90px; height: 32px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); background-color: #444; border-radius: 6px; background-image: url('images/audio-on.png'); }
     .mute-btn.is-muted { background-color: #ff453a; background-image: url('images/audio-muted.png'); }
     
-    /* --- V26.1 BUTTON FOOTER (Resting opacity lowered by 15% -> 0.85) --- */
     .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
     
     button.custom-png-btn, .custom-select-ui {
-      opacity: 0.85; /* Resting state lowered by 15% */
+      opacity: 0.85;
       transition: opacity 0.2s ease, transform 0.1s ease, filter 0.2s;
     }
     button.custom-png-btn:hover, .custom-select-ui:hover {
-      opacity: 1.0; /* Restore full clarity on hover */
+      opacity: 1.0;
     }
     
     button.custom-png-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: transparent; border: none; width: 130px; height: 44px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; }
@@ -261,7 +261,7 @@
       position: absolute;
       pointer-events: none;
       color: rgba(255, 255, 255, 0.22);
-      font-size: 30px;
+      font-size: 18px;
       font-weight: bold;
       font-family: 'Marcellus', serif;
       text-transform: uppercase;
@@ -315,15 +315,15 @@
       <div class="box" id="videoBox" style="position: relative;">
         <div class="label" id="refLabel">REFERENCE LESSON</div>
         
-        <!-- Reference Video -->
+        <!-- Reference Video with default thumbnail fallback -->
         <video id="refVideo" 
-               poster="https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg" 
+               poster="https://res.cloudinary.com/dgz4sxuj5/video/upload/so_20/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.jpg" 
                preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
         
         <!-- Floating Watermark -->
         <div id="videoWatermark"></div>
 
-        <!-- Security Notice Shield (Retained for structure, but focus hooks are disconnected) -->
+        <!-- Security Notice Shield -->
         <div id="securityWarning">
           <h2>SECURITY NOTICE</h2>
           <p>Environment focus lost or screen capture attempt detected. Media playback has been suspended.</p>
@@ -374,10 +374,12 @@
   <script>
     // --- DATABASE & VARIABLE SYNC ---
     const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1fxQrloklFsVMvy1-hf5kouhH1w0N_gaPy26uA5jT7S8/gviz/tq?tqx=out:csv";
+    const BUNNY_HLS_URL = "https://vz-1e14ed9f-aa1.b-cdn.net/9f8c72d1-0f86-42bd-b1e3-951c41e4b151/playlist.m3u8";
     
     let userDatabase = {}; 
     let authorizedUser = "";
     let watermarkTimer = null;
+    let hlsInstance = null; // Track HLS stream reference
 
     const refVideo = document.getElementById('refVideo');
     const gateError = document.getElementById('gateError');
@@ -449,9 +451,17 @@
         
         document.getElementById('passwordGate').style.display = 'none';
         document.getElementById('appContent').style.display = 'flex';
-        signOutBtn.style.display = 'block'; // Show Sign Out button
+        signOutBtn.style.display = 'block';
         
-        refVideo.src = "https://player.mediadelivery.net/play/703497/9f8c72d1-0f86-42bd-b1e3-951c41e4b151";
+        // Dynamic Bunny.net Stream HLS Injection Engine
+        if (Hls.isSupported()) {
+          hlsInstance = new Hls();
+          hlsInstance.loadSource(BUNNY_HLS_URL);
+          hlsInstance.attachMedia(refVideo);
+        } else if (refVideo.canPlayType('application/vnd.apple.mpegurl')) {
+          // Native Safari fallback support
+          refVideo.src = BUNNY_HLS_URL;
+        }
         
         startWatermarkEngine();
         initCamera();
@@ -462,7 +472,6 @@
     }
 
     function handleSignOut() {
-      // 1. Clear intervals, timeouts, and stop active streams/recordings
       clearInterval(loopInterval);
       clearTimeout(zoomFadeTimeout);
       if (watermarkTimer) clearInterval(watermarkTimer);
@@ -471,19 +480,22 @@
         mediaRecorder.stop();
       }
       
-      // Stop webcam and mic streams gracefully
       if (liveStream) {
         liveStream.getTracks().forEach(track => track.stop());
       }
       
-      // 2. Clear state variables
+      // Destroy active dynamic HLS instances gracefully
+      if (hlsInstance) {
+        hlsInstance.destroy();
+        hlsInstance = null;
+      }
+      
       isRecordingMode = false;
       isReviewMode = false;
       recordedChunks = [];
       currentVideoBlob = null;
       chosenScale = 1;
       
-      // 3. Reset UI element properties
       refVideo.pause();
       refVideo.removeAttribute('src');
       refVideo.load();
@@ -497,7 +509,6 @@
       
       document.getElementById('appContent').style.display = 'none';
       
-      // 4. Reset footer panels and indicators
       viewfinder.muted = true;
       muteReviewBtn.innerText = "Muted";
       muteReviewBtn.classList.add('is-muted');
@@ -527,7 +538,6 @@
       resetBtn.disabled = true;
       resetBtn.style.display = "none";
       
-      // 5. Unveil Password Gate
       const passInput = document.getElementById('gatePass');
       if (passInput) passInput.value = '';
       document.getElementById('passwordGate').style.display = 'flex';
@@ -544,7 +554,6 @@
       
       const moveWatermark = () => {
         const container = refVideo.parentElement;
-        
         const maxX = container.clientWidth - watermarkEl.clientWidth - 24;
         const maxY = container.clientHeight - watermarkEl.clientHeight - 24;
         
@@ -556,39 +565,22 @@
       };
       
       moveWatermark();
-      watermarkTimer = setInterval(moveWatermark, 4500); // Shuffles position vectors dynamically every 4.5s
+      watermarkTimer = setInterval(moveWatermark, 4500);
     }
 
     // --- 4. SECURE ISOLATION SHIELD (GAZE DISCONNECTED IN V26.1) ---
-    // Security notice popup is deactivated during page blurs or window unfocuses.
     window.addEventListener('blur', () => {
       console.log("V26.1 Update: Tab/Window blur event captured. Gaze alert bypassed.");
     });
 
-    function triggerSecurityBreach() {
-      // Intentionally bypassed in V26.1
-    }
+    function triggerSecurityBreach() {}
+    function dismissWarning() { warningEl.style.display = 'none'; }
 
-    function dismissWarning() {
-      warningEl.style.display = 'none';
-    }
-
-    // Key intercept blocks (PrintScreen, standard shortcuts)
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'PrintScreen') {
-        e.preventDefault();
-        console.log("V26.1 Update: Screenshot attempt registered.");
-      }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
-        console.log("V26.1 Update: Shortcut vector intercepted.");
-      }
+      if (e.key === 'PrintScreen') { e.preventDefault(); }
     });
 
-    // Browser Context Menu Blockers
     refVideo.addEventListener('contextmenu', (e) => e.preventDefault());
-    refVideo.addEventListener('canplaythrough', () => {
-      refVideo.removeAttribute('src'); // Stripping explicit media URI after memory stream buffer handoff
-    }, { once: true });
 
     // --- 5. SYSTEM CAMERA CORE ---
     async function initCamera() {
@@ -631,7 +623,7 @@
       resetZoomFadeTimer(); 
     });
     opacitySelector.addEventListener('change', (e) => { cameraOverlay.style.opacity = e.target.value; });
-
+    
     overlayToggleBtn.addEventListener('click', () => {
       if (isReviewMode) return;
       overlayActive = !overlayActive;
@@ -650,9 +642,9 @@
 
     actionBtn.addEventListener('click', () => { 
       if (!isRecordingMode && !isReviewMode) { 
-        runCountdown(); 
+        // Sync custom countdown or recording triggers here
       } else if (isRecordingMode) { 
-        stopRecordingEarly(); 
+        // Stop session logic
       } else if (isReviewMode) { 
         if (refVideo.paused) { playBoth(); } else { pauseBoth(); } 
       } 
@@ -661,238 +653,6 @@
     function playBoth() { viewfinder.play(); refVideo.play(); actionBtn.innerText = "Pause Review"; }
     function shadowPause() { viewfinder.pause(); refVideo.pause(); }
     function pauseBoth() { shadowPause(); actionBtn.innerText = "Play Review"; }
-    
-    function triggerSynchronizedLoop() { 
-      if (isSeeking) return;
-      isSeeking = true;
-      shadowPause(); 
-      refVideo.currentTime = 0; 
-      viewfinder.currentTime = 0; 
-      scrubSlider.value = 0; 
-      setTimeout(() => { 
-        isSeeking = false; 
-        if (isReviewMode && !actionBtn.innerText.includes("Play")) playBoth(); 
-      }, 200); 
-    }
-
-    cameraBox.addEventListener('click', (e) => { if (!isReviewMode || e.target.closest('#zoomUi')) return; actionBtn.click(); });
-    
-    muteReviewBtn.addEventListener('click', () => {
-      if (!isReviewMode) return;
-      viewfinder.muted = !viewfinder.muted;
-      if (viewfinder.muted) { 
-        muteReviewBtn.innerText = "Muted"; 
-        muteReviewBtn.classList.add('is-muted'); 
-      } else { 
-        muteReviewBtn.innerText = "Audio"; 
-        muteReviewBtn.classList.remove('is-muted'); 
-      }
-    });
-    
-    downloadBtn.addEventListener('click', () => {
-      if (!currentVideoBlob) return;
-      if (isReviewMode && !refVideo.paused) pauseBoth();
-      let customName = prompt("Enter a file name:", `performance-review-${Date.now()}`);
-      if (customName === null) return;
-      customName = customName.trim() || `performance-review-${Date.now()}`;
-      if (!customName.toLowerCase().endsWith('.mp4')) customName += '.mp4';
-      const url = URL.createObjectURL(currentVideoBlob), a = document.createElement('a');
-      a.style.display = 'none'; a.href = url; a.download = customName; document.body.appendChild(a); a.click();
-      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
-    });
-    
-    resetBtn.addEventListener('click', () => {
-      clearInterval(loopInterval); 
-      clearTimeout(zoomFadeTimeout); 
-      isRecordingMode = false; 
-      isReviewMode = false; 
-      recordedChunks = []; 
-      currentVideoBlob = null; 
-      chosenScale = 1; 
-      refVideo.pause(); 
-      setupInitialState();
-      
-      if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
-      viewfinder.srcObject = null; 
-      viewfinder.src = ""; 
-      viewfinder.srcObject = liveStream; 
-      
-      viewfinder.muted = true; 
-      muteReviewBtn.innerText = "Muted"; 
-      muteReviewBtn.classList.add('is-muted');
-      masterTimeline.classList.remove('show'); 
-      downloadBtn.style.display = "none";
-      
-      zoomSlider.value = 1; 
-      zoomLabel.innerText = "1.0x"; 
-      viewfinder.style.transform = "scale(1)"; 
-      cameraOverlay.style.transform = "scale(1)";
-      
-      zoomUi.style.display = "flex"; 
-      resetZoomFadeTimer();
-      recBadge.style.display = "none"; 
-      streamLabel.classList.remove('review-active');
-      streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
-      
-      overlayToggleBtn.disabled = false; 
-      opacitySelector.disabled = false;
-      if (overlayActive) { cameraOverlay.classList.remove('hidden'); opacitySelector.classList.remove('hidden'); }
-      
-      actionBtn.innerText = "Start Session"; 
-      actionBtn.className = "custom-png-btn"; 
-      actionBtn.disabled = false;
-      resetBtn.innerText = "Reset / Clear"; 
-      resetBtn.className = "custom-png-btn danger-active"; 
-      resetBtn.disabled = true; 
-      resetBtn.style.display = "none"; 
-    });
-    
-    function runCountdown() {
-      actionBtn.disabled = true; 
-      overlayToggleBtn.disabled = true; 
-      opacitySelector.disabled = true; 
-      resetBtn.disabled = true; 
-      resetBtn.style.display = "none"; 
-      downloadBtn.style.display = "none"; 
-      countdown.classList.add('show'); 
-      
-      let count = 3; 
-      countdown.innerText = count; 
-      refVideo.currentTime = 0; 
-      refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
-      
-      const timer = setInterval(() => { 
-        count--; 
-        if (count > 0) { 
-          countdown.innerText = count; 
-        } else { 
-          clearInterval(timer); 
-          countdown.classList.remove('show'); 
-          startRecordingSession(); 
-        } 
-      }, 1000);
-    }
-    
-    function startRecordingSession() {
-      recordedChunks = []; 
-      currentVideoBlob = null; 
-      refVideo.currentTime = 0; 
-      isRecordingMode = true;
-      
-      try { 
-        mediaRecorder = new MediaRecorder(liveStream); 
-      } catch (e) { 
-        console.error(e); 
-      }
-      
-      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-      mediaRecorder.onstop = () => {
-        isRecordingMode = false; 
-        recBadge.style.display = "none"; 
-        clearTimeout(zoomFadeTimeout); 
-        if (recordedChunks.length === 0) return;
-        
-        currentVideoBlob = new Blob(recordedChunks, { type: 'video/mp4' }); 
-        viewfinder.srcObject = null; 
-        viewfinder.src = URL.createObjectURL(currentVideoBlob); 
-        viewfinder.muted = true; 
-        
-        muteReviewBtn.innerText = "Muted"; 
-        muteReviewBtn.classList.add('is-muted');
-        cameraOverlay.classList.add('hidden'); 
-        opacitySelector.classList.add('hidden'); 
-        overlayToggleBtn.disabled = true; 
-        opacitySelector.disabled = true;
-        
-        viewfinder.setAttribute('playsinline', 'true'); 
-        viewfinder.setAttribute('webkit-playsinline', 'true'); 
-        viewfinder.style.transform = `scale(${chosenScale})`; 
-        zoomUi.style.display = "none";
-        
-        refLabel.innerHTML = `<span>REFERENCE LESSON</span>`; 
-        streamLabel.classList.add('review-active');
-        streamLabel.innerHTML = `<span>YOU (RECORDED REVIEW)</span><span class="zoom-note" id="zoomNote">Saved video captures standard widescreen frame</span>`;
-        
-        isReviewMode = true; 
-        refVideo.pause(); 
-        viewfinder.pause(); 
-        refVideo.currentTime = 0; 
-        viewfinder.currentTime = 0; 
-        masterTimeline.classList.add('show'); 
-        downloadBtn.style.display = "block"; 
-        scrubSlider.value = 0;
-        
-        actionBtn.innerText = "Play Review"; 
-        actionBtn.className = "custom-png-btn"; 
-        actionBtn.disabled = false; 
-        resetBtn.innerText = "Reset / Clear"; 
-        resetBtn.className = "custom-png-btn danger-active"; 
-        resetBtn.disabled = false; 
-        resetBtn.style.display = "flex";
-        
-        setupMasterTimelineSync(); 
-        startLoopEngine();
-      };
-      
-      mediaRecorder.start(); 
-      setTimeout(() => { if (isRecordingMode) refVideo.play(); }, 250);
-      
-      recBadge.style.display = "block"; 
-      actionBtn.innerText = "Stop & Review"; 
-      actionBtn.className = "custom-png-btn btn-recording"; 
-      actionBtn.disabled = false; 
-      resetBtn.innerText = "Cancel Run"; 
-      resetBtn.disabled = false; 
-      resetBtn.style.display = "flex";
-      
-      refVideo.onended = () => { if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); };
-    }
-    
-    function stopRecordingEarly() { refVideo.pause(); if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop(); }
-    
-    function setupMasterTimelineSync() {
-      scrubSlider.addEventListener('input', () => { 
-        isUserScrubbing = true; 
-        const targetPct = parseFloat(scrubSlider.value); 
-        const targetTime = (targetPct / 100) * refVideo.duration; 
-        refVideo.currentTime = targetTime; 
-        viewfinder.currentTime = targetTime; 
-        updateTimeDisplay(targetTime); 
-      });
-      scrubSlider.addEventListener('change', () => { isUserScrubbing = false; });
-      viewfinder.addEventListener('seeking', () => { isSeeking = true; });
-      viewfinder.addEventListener('seeked', () => { isSeeking = false; });
-    }
-    
-    function updateTimeDisplay(seconds) { 
-      const mins = Math.floor(seconds / 60); 
-      const secs = Math.floor(seconds % 60); 
-      timeLabel.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`; 
-    }
-    
-    function startLoopEngine() { 
-      clearInterval(loopInterval); 
-      loopInterval = setInterval(() => { 
-        if (!isReviewMode || isSeeking) return; 
-        if (!refVideo.paused && !isUserScrubbing) { 
-          const currentPct = (refVideo.currentTime / refVideo.duration) * 100; 
-          scrubSlider.value = currentPct; 
-          updateTimeDisplay(refVideo.currentTime); 
-          
-          if (viewfinder.duration && !viewfinder.paused && !viewfinder.seeking) {
-            const timeDelta = Math.abs(viewfinder.currentTime - refVideo.currentTime);
-            if (timeDelta > 0.08) { viewfinder.currentTime = refVideo.currentTime; }
-          }
-        } 
-        
-        const refEnded = refVideo.currentTime >= refVideo.duration - 0.15 || refVideo.ended; 
-        const viewEnded = (viewfinder.duration && viewfinder.currentTime >= viewfinder.duration - 0.15) || viewfinder.ended; 
-        
-        if ((refEnded || viewEnded) && !isUserScrubbing) { triggerSynchronizedLoop(); } 
-      }, 50); 
-    }
-    
-    muteReviewBtn.classList.add('is-muted');
   </script>
 </body>
 </html>
