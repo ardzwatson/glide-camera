@@ -732,12 +732,19 @@
       reviewPlayer.muted = false;
 
       try {
-        setupIsolatedAudioPipeline(reviewPlayer);
-        if (webAudioGainNode) webAudioGainNode.gain.setValueAtTime(0, webAudioContext.currentTime);
-        if (webAudioContext && webAudioContext.state !== 'suspended') {
-          webAudioContext.suspend();
-        }
-      } catch (e) {}
+       const audioSetupSuccess = setupIsolatedAudioPipeline(reviewPlayer);
+       if (audioSetupSuccess && webAudioGainNode) {
+         webAudioGainNode.gain.setValueAtTime(0, webAudioContext.currentTime);
+         if (webAudioContext && webAudioContext.state !== 'suspended') {
+           webAudioContext.suspend();
+         }
+       } else {
+         reviewPlayer.muted = true;
+       }
+      } catch (e) {
+       console.error('Audio setup error:', e);
+       reviewPlayer.muted = true;
+      }
 
       muteReviewBtn.innerText = "Muted";
       muteReviewBtn.classList.add('is-muted');
@@ -768,6 +775,16 @@
         }
       };
 
+      reviewPlayer.ontimeupdate = () => {
+        if (!isUserScrubbing && !isSeeking && isReviewPlaying) {
+          const validDuration = reviewPlayer.duration && isFinite(reviewPlayer.duration) && reviewPlayer.duration > 0;
+          if (validDuration) {
+            scrubSlider.value = reviewPlayer.currentTime;
+            updateTimeDisplayLabel(reviewPlayer.currentTime);
+          }
+        }
+      };
+
       addVideoEndedListener();
       initializePerformanceReviewClock();
     }
@@ -775,14 +792,24 @@
     function setupIsolatedAudioPipeline(targetVideoElement) {
       cleanupIsolatedAudioPipeline();
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContextClass) return;
+      if (!AudioContextClass) {
+        console.warn('AudioContext not available, using video muted property fallback');
+        return false;
+      }
       
-      webAudioContext = new AudioContextClass();
-      webAudioSourceNode = webAudioContext.createMediaElementSource(targetVideoElement);
-      webAudioGainNode = webAudioContext.createGain();
-      
-      webAudioSourceNode.connect(webAudioGainNode);
-      webAudioGainNode.connect(webAudioContext.destination);
+      try {
+        webAudioContext = new AudioContextClass();
+        webAudioSourceNode = webAudioContext.createMediaElementSource(targetVideoElement);
+        webAudioGainNode = webAudioContext.createGain();
+        
+        webAudioSourceNode.connect(webAudioGainNode);
+        webAudioGainNode.connect(webAudioContext.destination);
+        return true;
+      } catch (e) {
+        console.error('Audio pipeline setup failed:', e);
+        cleanupIsolatedAudioPipeline();
+        return false;
+      }
     }
 
     function cleanupIsolatedAudioPipeline() {
@@ -792,17 +819,25 @@
     }
 
     muteReviewBtn.addEventListener('click', () => {
-      if (!isReviewMode || !webAudioGainNode) return;
+      if (!isReviewMode) return;
       
       if (muteReviewBtn.classList.contains('is-muted')) {
-        webAudioGainNode.gain.setValueAtTime(1, webAudioContext.currentTime);
+        if (webAudioGainNode) {
+          webAudioGainNode.gain.setValueAtTime(1, webAudioContext.currentTime);
+          if (isReviewPlaying && webAudioContext.state === 'suspended') {
+            webAudioContext.resume();
+          }
+        } else {
+          reviewPlayer.muted = false;
+        }
         muteReviewBtn.innerText = "Unmuted";
         muteReviewBtn.classList.remove('is-muted');
-        if (isReviewPlaying && webAudioContext.state === 'suspended') {
-          webAudioContext.resume();
-        }
       } else {
-        webAudioGainNode.gain.setValueAtTime(0, webAudioContext.currentTime);
+        if (webAudioGainNode) {
+          webAudioGainNode.gain.setValueAtTime(0, webAudioContext.currentTime);
+        } else {
+          reviewPlayer.muted = true;
+        }
         muteReviewBtn.innerText = "Muted";
         muteReviewBtn.classList.add('is-muted');
       }
