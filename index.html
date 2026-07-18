@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V27.6)</title>
+  <title>Sync Performance Review (V27.7)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&amp;display=swap" rel="stylesheet">
@@ -248,7 +248,7 @@
     .custom-select-ui.hidden { display: none !important; }
     .custom-select-ui:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    #downloadBtn { background-color: #34c759; border-radius: 8px; display: none; }
+    #downloadBtn { background-color: #34c75 green; border-radius: 8px; display: none; }
     .version-tag { color: #556; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: 'Marcellus', serif; position: absolute; right: 4px; }
     .countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: #fff; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
     .countdown-overlay.show { opacity: 1; }
@@ -270,6 +270,7 @@
       display: none;
       user-select: none;
       -webkit-user-select: none;
+      will-change: transform;
     }
   </style>
 </head>
@@ -339,7 +340,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V27.6</div>
+      <div class="version-tag">V27.7</div>
     </div>
   </div>
 
@@ -418,7 +419,12 @@
         signOutBtn.style.display = 'block';
         
         if (Hls.isSupported()) {
-          hlsInstance = new Hls();
+          hlsInstance = new Hls({
+            maxBufferLength: 10,
+            maxMaxBufferLength: 20,
+            enableWorker: true,
+            lowLatencyMode: true
+          });
           hlsInstance.loadSource(BUNNY_HLS_URL);
           hlsInstance.attachMedia(refVideo);
         } else if (refVideo.canPlayType('application/vnd.apple.mpegurl')) {
@@ -467,20 +473,31 @@
     function startWatermarkEngine() {
       watermarkEl.innerText = `${authorizedUser} • DRAFT PREVIEW`;
       watermarkEl.style.display = 'block';
+      
       const moveWatermark = () => {
+        if (isRecordingMode || isReviewMode) return; // Prevent DOM manipulation frames from glitching playback
+        
         const container = refVideo.parentElement;
-        const maxX = container.clientWidth - watermarkEl.clientWidth - 24;
-        const maxY = container.clientHeight - watermarkEl.clientHeight - 24;
-        const randomX = Math.max(12, Math.floor(Math.random() * maxX));
-        const randomY = Math.max(12, Math.floor(Math.random() * maxY));
-        watermarkEl.style.left = `${randomX}px`; watermarkEl.style.top = `${randomY}px`;
+        const maxX = 640 - watermarkEl.clientWidth - 24;
+        const maxY = 360 - watermarkEl.clientHeight - 24;
+        const randomX = Math.max(12, Math.floor(Math.random() * Math.max(100, maxX)));
+        const randomY = Math.max(12, Math.floor(Math.random() * Math.max(100, maxY)));
+        
+        watermarkEl.style.transform = `translate(${randomX}px, ${randomY}px)`;
+        watermarkEl.style.left = '0px';
+        watermarkEl.style.top = '0px';
       };
-      moveWatermark(); watermarkTimer = setInterval(moveWatermark, 4500);
+      
+      moveWatermark(); 
+      watermarkTimer = setInterval(moveWatermark, 4500);
     }
 
     async function initCamera() {
       try { 
-        liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 360 } }, audio: true }); 
+        liveStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }, 
+          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } 
+        }); 
         viewfinder.srcObject = liveStream; 
         resetZoomFadeTimer(); setupInitialState(); 
       } catch (err) { setupInitialState(); }
@@ -576,293 +593,254 @@
       resetBtn.disabled = true;
 
       refVideo.addEventListener('ended', handleVideoTrackFinished, { once: true });
-
-      let options = { mimeType: 'video/mp4;codecs=avc1,mp4a.40.2' };
+      
+      let options = { mimeType: 'video/webm;codecs=vp8,opus' };
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options = { mimeType: 'video/mp4;codecs=avc1,opus' };
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-          options = { mimeType: 'video/mp4' };
-          if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-            options = { mimeType: 'video/webm;codecs=vp9,opus', audio: true };
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-              options = { mimeType: 'video/webm;codecs=vp8,opus', audio: true };
-            }
-          }
-        }
+        options = { mimeType: 'video/mp4' };
       }
 
       try {
         mediaRecorder = new MediaRecorder(liveStream, options);
-      } catch (e) {
-        mediaRecorder = new MediaRecorder(liveStream);
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+        };
+        mediaRecorder.onstop = () => { processRecordedVideo(); };
+        
+        // Start processing tracks cleanly simultaneously
+        mediaRecorder.start(1000); // chunk every 1 sec to avoid huge garbage collection spikes
+        refVideo.play();
+      } catch (err) {
+        console.error("Recording engine initialization failure", err);
+        isRecordingMode = false;
+        setupInitialState();
       }
-
-      mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
-      mediaRecorder.onstop = compileSessionData;
-
-      refVideo.play();
-      mediaRecorder.start(10);
     }
 
     function stopRecordingSession() {
-      refVideo.removeEventListener('ended', handleVideoTrackFinished);
+      if (!isRecordingMode) return;
       refVideo.pause();
       if (mediaRecorder && mediaRecorder.state !== "inactive") {
         mediaRecorder.stop();
       }
+      isRecordingMode = false;
+      recBadge.style.display = "none";
     }
 
-    function initIsolatedAudioPipeline() {
-      if (webAudioContext) return;
-      try {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        webAudioContext = new AudioContextClass();
-        webAudioSourceNode = webAudioContext.createMediaElementSource(viewfinder);
-        webAudioGainNode = webAudioContext.createGain();
-        
-        webAudioSourceNode.connect(webAudioGainNode);
-        webAudioGainNode.connect(webAudioContext.destination);
-        
-        // Ensure element itself stays unmuted so telemetry frames flow down
-        viewfinder.muted = false;
-        // Drive attenuation safely using Web Audio gain stage to block video element clock stuttering
-        webAudioGainNode.gain.setValueAtTime(0, webAudioContext.currentTime);
-      } catch (e) {
-        viewfinder.muted = true;
-      }
-    }
-
-    function cleanupIsolatedAudioPipeline() {
-      if (webAudioContext) {
-        try { webAudioContext.close(); } catch(e){}
-        webAudioContext = null; webAudioSourceNode = null; webAudioGainNode = null;
-      }
-    }
-
-    function compileSessionData() {
-      currentVideoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
+    function processRecordedVideo() {
+      currentVideoBlob = new Blob(recordedChunks, { type: 'video/webm' });
       const videoURL = URL.createObjectURL(currentVideoBlob);
       
-      isRecordingMode = false;
       isReviewMode = true;
       isReviewPlaying = false;
       
-      recBadge.style.display = "none";
+      viewfinder.srcObject = null;
+      viewfinder.src = videoURL;
+      viewfinder.load();
+      
+      viewfinder.muted = false;
+      muteReviewBtn.innerText = "Unmuted";
+      muteReviewBtn.classList.remove('is-muted');
+      
+      refVideo.currentTime = 0;
+      viewfinder.currentTime = 0;
+      
+      actionBtn.innerText = "Play Review";
+      actionBtn.className = "custom-png-btn";
+      
+      resetBtn.style.display = "block";
+      resetBtn.disabled = false;
+      downloadBtn.style.display = "block";
+      masterTimeline.classList.add('show');
+      
       zoomUi.style.display = "none";
       cameraOverlay.classList.add('hidden');
-      
       overlayToggleBtn.classList.add('hidden');
       opacitySelector.classList.add('hidden');
       
       streamLabel.classList.add('review-active');
-      streamLabel.innerHTML = `<span>YOUR RECORDED PERFORMANCE</span>`;
+      streamLabel.innerHTML = `<span>YOUR RECORDING (REVIEW MODE)</span>`;
       
-      viewfinder.srcObject = null;
-      viewfinder.src = videoURL;
-      viewfinder.controls = false;
-      
-      initIsolatedAudioPipeline();
-      muteReviewBtn.innerText = "Muted";
-      muteReviewBtn.classList.add('is-muted');
+      setupIsolatedAudioPipeline();
 
-      actionBtn.innerText = "Play Review";
-      actionBtn.className = "custom-png-btn";
-      
-      resetBtn.innerText = "Reset / Clear";
-      resetBtn.className = "custom-png-btn";
-      resetBtn.disabled = false;
-      resetBtn.style.display = "block";
-      
-      downloadBtn.style.display = "block";
-      masterTimeline.classList.add('show');
+      setTimeout(() => {
+        scrubSlider.max = refVideo.duration || 100;
+        scrubSlider.value = 0;
+        updateTimeUI(0);
+      }, 500);
 
+      loopInterval = setInterval(synchronizePlaybackTimeline, 33);
+    }
+
+    function setupIsolatedAudioPipeline() {
+      try {
+        if (!webAudioContext) {
+          webAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+          webAudioSourceNode = webAudioContext.createMediaElementSource(viewfinder);
+          webAudioGainNode = webAudioContext.createGain();
+          webAudioSourceNode.connect(webAudioGainNode);
+          webAudioGainNode.connect(webAudioContext.destination);
+        }
+        if (webAudioContext.state === 'suspended') {
+          webAudioContext.resume();
+        }
+        webAudioGainNode.gain.setValueAtTime(1.0, webAudioContext.currentTime);
+      } catch(e) {
+        console.warn("Isolated audio profile failed fallback running natively.", e);
+      }
+    }
+
+    function cleanupIsolatedAudioPipeline() {
+      if (webAudioGainNode) {
+        webAudioGainNode.gain.setValueAtTime(0.0, webAudioContext.currentTime);
+      }
+    }
+
+    function playBoth() {
+      if (!isReviewMode) return;
+      if (webAudioContext && webAudioContext.state === 'suspended') {
+        webAudioContext.resume();
+      }
+      
+      // Enforce strict lock alignment on call play 
+      const syncTime = refVideo.currentTime;
+      viewfinder.currentTime = syncTime;
+      
+      refVideo.play();
+      viewfinder.play();
+      isReviewPlaying = true;
+      actionBtn.innerText = "Pause Review";
+    }
+
+    function pauseBoth() {
       refVideo.pause();
       viewfinder.pause();
-      refVideo.currentTime = 0;
-      viewfinder.currentTime = 0;
+      isReviewPlaying = false;
+      actionBtn.innerText = "Play Review";
+    }
+
+    function synchronizePlaybackTimeline() {
+      if (!isReviewMode || isUserScrubbing || isSeeking) return;
       
-      viewfinder.addEventListener('loadedmetadata', setupTimelineUI, { once: true });
-      if (viewfinder.duration) setupTimelineUI();
+      const current = refVideo.currentTime;
+      scrubSlider.value = current;
+      updateTimeUI(current);
 
-      if (loopInterval) clearInterval(loopInterval);
-      loopInterval = setInterval(synchronizeClocks, 15);
-    }
-
-    function setupTimelineUI() {
-      scrubSlider.max = viewfinder.duration || refVideo.duration || 100;
-      scrubSlider.value = 0;
-    }
-
-    function synchronizeClocks() {
-      if (isUserScrubbing || isSeeking) return;
-
-      if (viewfinder.ended || refVideo.ended || (viewfinder.duration && viewfinder.currentTime >= viewfinder.duration)) {
-        refVideo.pause();
-        viewfinder.pause();
-        refVideo.currentTime = 0;
-        viewfinder.currentTime = 0;
-        
-        if (isReviewPlaying) {
-          setTimeout(() => {
-            refVideo.play().catch(()=>{});
-            viewfinder.play().catch(()=>{});
-          }, 40);
-        }
-        return;
+      // Jitter alignment safety cushion (If split deviations break 150ms parameters reset frame alignment)
+      if (Math.abs(refVideo.currentTime - viewfinder.currentTime) > 0.15) {
+        viewfinder.currentTime = refVideo.currentTime;
       }
-
-      if (!isReviewPlaying) return;
-
-      if (Math.abs(viewfinder.currentTime - refVideo.currentTime) > 0.12) {
-        if (!viewfinder.seeking && !refVideo.seeking) {
-          isSeeking = true;
-          viewfinder.currentTime = refVideo.currentTime;
-          setTimeout(() => { isSeeking = false; }, 40);
-        }
-      }
-
-      scrubSlider.value = viewfinder.currentTime;
-      updateTimeLabel(viewfinder.currentTime);
     }
 
-    function updateTimeLabel(time) {
-      const mins = Math.floor(time / 60);
-      const secs = Math.floor(time % 60);
+    function updateTimeUI(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
       timeLabel.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
 
     scrubSlider.addEventListener('input', () => {
       isUserScrubbing = true;
       const targetTime = parseFloat(scrubSlider.value);
-      refVideo.currentTime = targetTime;
-      viewfinder.currentTime = targetTime;
-      updateTimeLabel(targetTime);
+      updateTimeUI(targetTime);
     });
 
-    scrubSlider.addEventListener('change', () => {
+    scrubSlider.addEventListener('change', async () => {
+      isSeeking = true;
+      const targetTime = parseFloat(scrubSlider.value);
+      
+      refVideo.currentTime = targetTime;
+      viewfinder.currentTime = targetTime;
+      
+      // Verification loop wait handling matching tracks
+      await Promise.all([
+        new Promise(r => { refVideo.onseeking = r; }),
+        new Promise(r => { viewfinder.onseeking = r; })
+      ]);
+      
       isUserScrubbing = false;
+      isSeeking = false;
     });
 
     muteReviewBtn.addEventListener('click', () => {
-      if (!webAudioContext || !webAudioGainNode) {
-        initIsolatedAudioPipeline();
-      }
-
-      if (webAudioContext && webAudioContext.state === 'suspended') {
-        webAudioContext.resume();
-      }
-
-      const isCurrentlyMuted = muteReviewBtn.classList.contains('is-muted');
-      
-      if (isCurrentlyMuted) {
-        // Unmute: Ramp Web Audio Gain node to 1.0 safely without resetting elements mid-flight
-        if (webAudioGainNode) webAudioGainNode.gain.setValueAtTime(1.0, webAudioContext.currentTime);
+      if (!isReviewMode) return;
+      if (viewfinder.muted) {
+        viewfinder.muted = false;
+        if (webAudioGainNode && webAudioContext) webAudioGainNode.gain.setValueAtTime(1.0, webAudioContext.currentTime);
         muteReviewBtn.innerText = "Unmuted";
         muteReviewBtn.classList.remove('is-muted');
       } else {
-        // Mute: Drop Web Audio gain target down to 0
-        if (webAudioGainNode) webAudioGainNode.gain.setValueAtTime(0.0, webAudioContext.currentTime);
+        viewfinder.muted = true;
+        if (webAudioGainNode && webAudioContext) webAudioGainNode.gain.setValueAtTime(0.0, webAudioContext.currentTime);
         muteReviewBtn.innerText = "Muted";
         muteReviewBtn.classList.add('is-muted');
       }
     });
 
-    function playBoth() {
-      if (webAudioContext && webAudioContext.state === 'suspended') {
-        webAudioContext.resume();
-      }
-      isReviewPlaying = true;
-      viewfinder.play().catch(()=>{});
-      refVideo.play().catch(()=>{});
-      actionBtn.innerText = "Pause Review";
-    }
-
-    function pauseBoth() {
-      isReviewPlaying = false;
-      viewfinder.pause();
-      refVideo.pause();
-      actionBtn.innerText = "Play Review";
-    }
-
     resetBtn.addEventListener('click', () => {
+      if (!isReviewMode) return;
       if (!resetBtn.classList.contains('danger-active')) {
         resetBtn.classList.add('danger-active');
-        resetBtn.innerText = "Confirm Reset?";
+        resetBtn.innerText = "Are you sure?";
         setTimeout(() => {
-          if (resetBtn.classList.contains('danger-active')) {
-            resetBtn.classList.remove('danger-active');
-            resetBtn.innerText = "Reset / Clear";
-          }
-        }, 4000);
+          resetBtn.classList.remove('danger-active');
+          resetBtn.innerText = "Reset / Clear";
+        }, 3000);
       } else {
+        clearInterval(loopInterval);
+        cleanupIsolatedAudioPipeline();
+        
+        isReviewMode = false;
+        isReviewPlaying = false;
+        recordedChunks = [];
+        currentVideoBlob = null;
+        
+        refVideo.pause();
+        refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
+        
+        viewfinder.pause();
+        viewfinder.src = "";
+        viewfinder.srcObject = liveStream;
+        viewfinder.muted = true;
+        
+        muteReviewBtn.innerText = "Muted";
+        muteReviewBtn.classList.add('is-muted');
+        
+        masterTimeline.classList.remove('show');
+        downloadBtn.style.display = "none";
+        resetBtn.style.display = "none";
+        resetBtn.disabled = true;
         resetBtn.classList.remove('danger-active');
-        executeSystemReset();
+        resetBtn.innerText = "Reset / Clear";
+        
+        zoomUi.style.display = "flex";
+        if (overlayActive) cameraOverlay.classList.remove('hidden');
+        overlayToggleBtn.classList.remove('hidden');
+        opacitySelector.classList.remove('hidden');
+        
+        actionBtn.innerText = "Start Session";
+        actionBtn.className = "custom-png-btn";
+        
+        streamLabel.classList.remove('review-active');
+        streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
+        refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing alignment framework (${PRE_RECORD_ALIGN_TIME}s)</span>`;
+        
+        initCamera();
       }
     });
-
-    function executeSystemReset() {
-      cleanupIsolatedAudioPipeline();
-      clearInterval(loopInterval);
-      refVideo.removeEventListener('ended', handleVideoTrackFinished);
-      
-      refVideo.pause();
-      viewfinder.pause();
-      refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
-      refVideo.setAttribute('poster', THUMBNAIL_ASSET);
-      
-      isReviewMode = false;
-      isRecordingMode = false;
-      isReviewPlaying = false;
-      recordedChunks = [];
-      currentVideoBlob = null;
-
-      viewfinder.src = "";
-      viewfinder.srcObject = liveStream;
-      viewfinder.muted = true;
-      
-      muteReviewBtn.innerText = "Muted";
-      muteReviewBtn.classList.add('is-muted');
-      masterTimeline.classList.remove('show');
-      downloadBtn.style.display = "none";
-      
-      streamLabel.classList.remove('review-active');
-      streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
-      
-      zoomUi.style.display = "flex";
-      zoomSlider.value = 1;
-      zoomLabel.innerText = "1.0x";
-      viewfinder.style.transform = "scale(1)";
-      resetZoomFadeTimer();
-
-      overlayToggleBtn.classList.remove('hidden');
-      opacitySelector.classList.remove('hidden');
-      overlayToggleBtn.disabled = false;
-      opacitySelector.disabled = false;
-      
-      if (overlayActive) { cameraOverlay.classList.remove('hidden'); }
-      
-      actionBtn.innerText = "Start Session";
-      actionBtn.className = "custom-png-btn";
-      
-      resetBtn.innerText = "Reset / Clear";
-      resetBtn.style.display = "none";
-      resetBtn.disabled = true;
-
-      setupInitialState();
-    }
 
     downloadBtn.addEventListener('click', () => {
       if (!currentVideoBlob) return;
       const url = URL.createObjectURL(currentVideoBlob);
       const a = document.createElement('a');
+      a.style.display = 'none';
       a.href = url;
-      a.download = `Performance_Review_${new Date().toISOString().slice(0,10)}.mp4`;
+      a.download = `Performance_Review_${authorizedUser.replace(/\s+/g, '_')}.webm`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 100);
     });
-
-    refVideo.addEventListener('contextmenu', (e) => e.preventDefault());
   </script>
 </body>
 </html>
