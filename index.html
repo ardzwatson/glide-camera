@@ -148,14 +148,7 @@
       .mute-btn-container button { width: 80px !important; height: 26px !important; }
     }
     .box { position: relative; width: 100%; flex: 1 1 0%; height: 0; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
-    
-    .video-viewport-wrapper {
-      width: 100%;
-      height: 100%;
-      position: relative;
-      overflow: hidden;
-      background: #000;
-    }
+    .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; background: #000; }
     
     video { 
       width: 100%; 
@@ -170,10 +163,10 @@
       position: relative;
     }
     
-    /* V27.6 Structural Unified Background Asset Overlay Setup */
-    .sync-thumbnail-overlay {
+    .viewfinder-overlay {
       position: absolute;
       inset: 0;
+      background-image: url('https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg');
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
@@ -181,9 +174,17 @@
       pointer-events: none;
       z-index: 5;
       display: block;
-      transition: opacity 0.25s ease;
+      transition: opacity 0.2s ease;
     }
-    .sync-thumbnail-overlay.hidden { display: none !important; opacity: 0 !important; }
+    .viewfinder-overlay.hidden { display: none !important; }
+
+    #refVideoContainer {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background: #000;
+      overflow: hidden;
+    }
     
     .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 2px; }
     #refLabel { background: rgba(46, 125, 50, 0.7); } 
@@ -210,7 +211,7 @@
     .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
     
     button.custom-png-btn, .custom-select-ui {
-      opacity: 0.85; /* V27.6 Dashboard Aesthetic Spec */
+      opacity: 0.85;
       transition: opacity 0.2s ease, transform 0.1s ease, filter 0.2s;
     }
     button.custom-png-btn:hover, .custom-select-ui:hover { opacity: 1.0; }
@@ -293,9 +294,11 @@
       <div class="box" id="videoBox">
         <div class="label" id="refLabel">REFERENCE LESSON</div>
         
-        <div class="video-viewport-wrapper">
-          <video id="refVideo" preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
-          <div id="refOverlay" class="sync-thumbnail-overlay"></div>
+        <div id="refVideoContainer">
+          <!-- Explicit poster configuration directly handling matching properties -->
+          <video id="refVideo" 
+                 poster="https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg" 
+                 preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
         </div>
         
         <div id="videoWatermark"></div>
@@ -305,9 +308,9 @@
       <div class="box" id="cameraBox">
         <div class="label" id="streamLabel"><span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span></div>
         <div class="rec-indicator" id="recBadge">● RECORDING</div>
-        <div class="video-viewport-wrapper">
+        <div class="viewfinder-container">
           <video id="viewfinder" autoplay playsinline webkit-playsinline muted></video>
-          <div id="cameraOverlay" class="sync-thumbnail-overlay"></div>
+          <div id="cameraOverlay" class="viewfinder-overlay"></div>
         </div>
         <div class="zoom-container" id="zoomUi"><input type="range" id="zoomSlider" class="zoom-slider" min="1" max="2" step="0.1" value="1"><label id="zoomLabel">1.0x</label></div>
       </div>
@@ -350,19 +353,18 @@
     let watermarkTimer = null;
     let hlsInstance = null;
 
-    // V27.6 Isolated Web Audio API Context Configuration Pool
+    // Web Audio Isolated Node Context Variables
     let webAudioContext = null;
     let webAudioSourceNode = null;
     let webAudioGainNode = null;
 
     const refVideo = document.getElementById('refVideo');
-    const refOverlay = document.getElementById('refOverlay');
-    const cameraOverlay = document.getElementById('cameraOverlay');
     const gateError = document.getElementById('gateError');
     const watermarkEl = document.getElementById('videoWatermark');
     const signOutBtn = document.getElementById('signOutBtn');
 
     const viewfinder = document.getElementById('viewfinder');
+    const cameraOverlay = document.getElementById('cameraOverlay');
     const actionBtn = document.getElementById('actionBtn');
     const overlayToggleBtn = document.getElementById('overlayToggleBtn');
     const opacitySelector = document.getElementById('opacitySelector');
@@ -385,12 +387,9 @@
     let overlayActive = true; 
     const PRE_RECORD_ALIGN_TIME = 20;
 
-    // Forced shared image background asset synchronizer setup
-    function boundThumbnailsToFixedLayer() {
-      refOverlay.style.backgroundImage = `url('${THUMBNAIL_ASSET}')`;
-      cameraOverlay.style.backgroundImage = `url('${THUMBNAIL_ASSET}')`;
-    }
-    boundThumbnailsToFixedLayer();
+    refVideo.addEventListener('loadstart', () => {
+      refVideo.setAttribute('poster', THUMBNAIL_ASSET);
+    });
 
     async function fetchAccessDatabase() {
       try {
@@ -425,7 +424,6 @@
         } else if (refVideo.canPlayType('application/vnd.apple.mpegurl')) {
           refVideo.src = BUNNY_HLS_URL;
         }
-        boundThumbnailsToFixedLayer();
         startWatermarkEngine();
         initCamera();
       } else {
@@ -436,16 +434,15 @@
 
     function handleSignOut() {
       cleanupIsolatedAudioPipeline();
-      if (loopInterval) { clearInterval(loopInterval); loopInterval = null; }
-      if (zoomFadeTimeout) { clearTimeout(zoomFadeTimeout); zoomFadeTimeout = null; }
-      if (watermarkTimer) { clearInterval(watermarkTimer); watermarkTimer = null; }
+      clearInterval(loopInterval);
+      clearTimeout(zoomFadeTimeout);
+      if (watermarkTimer) clearInterval(watermarkTimer);
       if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
       if (liveStream) liveStream.getTracks().forEach(track => track.stop());
       if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
       
       isRecordingMode = false; isReviewMode = false; isReviewPlaying = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1;
-      refVideo.pause(); refVideo.removeAttribute('src'); 
-      
+      refVideo.pause(); refVideo.removeAttribute('src'); refVideo.setAttribute('poster', THUMBNAIL_ASSET); refVideo.load();
       viewfinder.srcObject = null; viewfinder.src = "";
       watermarkEl.style.display = 'none'; signOutBtn.style.display = 'none';
       document.getElementById('appContent').style.display = 'none';
@@ -458,11 +455,7 @@
       
       overlayToggleBtn.classList.remove('hidden'); opacitySelector.classList.remove('hidden');
       overlayToggleBtn.disabled = false; opacitySelector.disabled = false; overlayActive = true;
-      
-      boundThumbnailsToFixedLayer();
-      refOverlay.classList.remove('hidden');
       cameraOverlay.classList.remove('hidden'); 
-      
       actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
       resetBtn.innerText = "Reset / Clear"; resetBtn.disabled = true; resetBtn.style.display = "none"; resetBtn.classList.remove('danger-active');
       const passInput = document.getElementById('gatePass'); if (passInput) passInput.value = '';
@@ -476,7 +469,6 @@
       watermarkEl.style.display = 'block';
       const moveWatermark = () => {
         const container = refVideo.parentElement;
-        if (!container) return;
         const maxX = container.clientWidth - watermarkEl.clientWidth - 24;
         const maxY = container.clientHeight - watermarkEl.clientHeight - 24;
         const randomX = Math.max(12, Math.floor(Math.random() * maxX));
@@ -497,8 +489,7 @@
     function setupInitialState() {
       if (!isReviewMode && !isRecordingMode) {
         refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
-        boundThumbnailsToFixedLayer();
-        refOverlay.classList.remove('hidden');
+        refVideo.setAttribute('poster', THUMBNAIL_ASSET);
         refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing alignment framework (${PRE_RECORD_ALIGN_TIME}s)</span>`;
         if (overlayActive) { cameraOverlay.classList.remove('hidden'); }
         overlayToggleBtn.classList.remove('hidden');
@@ -576,7 +567,6 @@
       
       recBadge.style.display = "block";
       refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
-      refOverlay.classList.add('hidden'); 
       
       actionBtn.innerText = "Stop Session";
       actionBtn.className = "custom-png-btn btn-recording";
@@ -608,7 +598,7 @@
       }
 
       mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
-      mediaRecorder.onstop = () => { compileSessionData(); };
+      mediaRecorder.onstop = compileSessionData;
 
       refVideo.play();
       mediaRecorder.start(10);
@@ -622,7 +612,6 @@
       }
     }
 
-    // Isolated mobile-hardened Web Audio pipeline rendering architecture
     function initIsolatedAudioPipeline() {
       if (webAudioContext) return;
       try {
@@ -634,7 +623,9 @@
         webAudioSourceNode.connect(webAudioGainNode);
         webAudioGainNode.connect(webAudioContext.destination);
         
+        // Ensure element itself stays unmuted so telemetry frames flow down
         viewfinder.muted = false;
+        // Drive attenuation safely using Web Audio gain stage to block video element clock stuttering
         webAudioGainNode.gain.setValueAtTime(0, webAudioContext.currentTime);
       } catch (e) {
         viewfinder.muted = true;
@@ -659,7 +650,6 @@
       recBadge.style.display = "none";
       zoomUi.style.display = "none";
       cameraOverlay.classList.add('hidden');
-      refOverlay.classList.add('hidden');
       
       overlayToggleBtn.classList.add('hidden');
       opacitySelector.classList.add('hidden');
@@ -759,16 +749,18 @@
       }
 
       if (webAudioContext && webAudioContext.state === 'suspended') {
-        webAudioContext.resume().catch(()=>{});
+        webAudioContext.resume();
       }
 
       const isCurrentlyMuted = muteReviewBtn.classList.contains('is-muted');
       
       if (isCurrentlyMuted) {
+        // Unmute: Ramp Web Audio Gain node to 1.0 safely without resetting elements mid-flight
         if (webAudioGainNode) webAudioGainNode.gain.setValueAtTime(1.0, webAudioContext.currentTime);
         muteReviewBtn.innerText = "Unmuted";
         muteReviewBtn.classList.remove('is-muted');
       } else {
+        // Mute: Drop Web Audio gain target down to 0
         if (webAudioGainNode) webAudioGainNode.gain.setValueAtTime(0.0, webAudioContext.currentTime);
         muteReviewBtn.innerText = "Muted";
         muteReviewBtn.classList.add('is-muted');
@@ -777,7 +769,7 @@
 
     function playBoth() {
       if (webAudioContext && webAudioContext.state === 'suspended') {
-        webAudioContext.resume().catch(()=>{});
+        webAudioContext.resume();
       }
       isReviewPlaying = true;
       viewfinder.play().catch(()=>{});
@@ -810,12 +802,13 @@
 
     function executeSystemReset() {
       cleanupIsolatedAudioPipeline();
-      if (loopInterval) { clearInterval(loopInterval); loopInterval = null; }
+      clearInterval(loopInterval);
       refVideo.removeEventListener('ended', handleVideoTrackFinished);
       
       refVideo.pause();
       viewfinder.pause();
       refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
+      refVideo.setAttribute('poster', THUMBNAIL_ASSET);
       
       isReviewMode = false;
       isRecordingMode = false;
@@ -846,8 +839,6 @@
       overlayToggleBtn.disabled = false;
       opacitySelector.disabled = false;
       
-      boundThumbnailsToFixedLayer();
-      refOverlay.classList.remove('hidden');
       if (overlayActive) { cameraOverlay.classList.remove('hidden'); }
       
       actionBtn.innerText = "Start Session";
