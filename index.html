@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V27.1)</title>
+  <title>Sync Performance Review (V27.2)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&amp;display=swap" rel="stylesheet">
@@ -99,7 +99,7 @@
     }
     .gate-error { color: #ff453a; font-size: 12px; margin-top: 10px; display: none; }
 
-    /* --- V27.0 SIGN-OUT BUTTON --- */
+    /* --- SIGN-OUT BUTTON --- */
     #signOutBtn {
       position: fixed;
       left: 0;
@@ -163,7 +163,7 @@
       user-select: none;
     }
     
-    /* Updated Overlay: Aligned with your new Bunny Video thumbnail framework */
+    /* Overlay Layout: Locked explicitly to matching framework cover thumbnail */
     .viewfinder-overlay {
       position: absolute;
       inset: 0;
@@ -255,18 +255,19 @@
     .rec-indicator { position: absolute; top: 12px; right: 12px; background: #ff3b30; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; animation: pulse 1s infinite alternate; display: none; z-index: 10; }
     @keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
 
+    /* Updated Watermark: Increased scale size to 24px and dropped transparency opacity step to 0.14 */
     #videoWatermark {
       position: absolute;
       pointer-events: none;
-      color: rgba(255, 255, 255, 0.22);
-      font-size: 18px;
+      color: rgba(255, 255, 255, 0.14);
+      font-size: 24px;
       font-weight: bold;
       font-family: 'Marcellus', serif;
       text-transform: uppercase;
       letter-spacing: 2px;
       z-index: 15;
       white-space: nowrap;
-      text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
       display: none;
       user-select: none;
       -webkit-user-select: none;
@@ -295,7 +296,7 @@
       <div class="box" id="videoBox" style="position: relative;">
         <div class="label" id="refLabel">REFERENCE LESSON</div>
         
-        <!-- Updated Reference Poster: Linked to your new Bunny framework -->
+        <!-- Updated Reference Poster: Set matching thumbnail reference path -->
         <video id="refVideo" 
                poster="https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg" 
                preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
@@ -338,13 +339,12 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V27.0</div>
+      <div class="version-tag">V28.0</div>
     </div>
   </div>
 
   <script>
     const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1fxQrloklFsVMvy1-hf5kouhH1w0N_gaPy26uA5jT7S8/gviz/tq?tqx=out:csv";
-    // Target modern Bunny asset framework hash reference
     const BUNNY_HLS_URL = "https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/playlist.m3u8";
     
     let userDatabase = {}; 
@@ -540,6 +540,13 @@
       }, 1000);
     }
 
+    // Dynamic auto-termination execution anchor
+    function handleVideoTrackFinished() {
+      if (isRecordingMode) {
+        stopRecordingSession();
+      }
+    }
+
     function startRecordingSession() {
       isRecordingMode = true;
       recordedChunks = [];
@@ -554,7 +561,9 @@
       resetBtn.style.display = "none";
       resetBtn.disabled = true;
 
-      // Prioritize full video and audio MP4 container parameters
+      // Automatically terminate processing loop when video completes timeline
+      refVideo.addEventListener('ended', handleVideoTrackFinished, { once: true });
+
       let options = { mimeType: 'video/mp4;codecs=avc1,mp4a.40.2' };
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
         options = { mimeType: 'video/mp4;codecs=avc1,opus' };
@@ -583,6 +592,7 @@
     }
 
     function stopRecordingSession() {
+      refVideo.removeEventListener('ended', handleVideoTrackFinished);
       refVideo.pause();
       if (mediaRecorder && mediaRecorder.state !== "inactive") {
         mediaRecorder.stop();
@@ -610,7 +620,6 @@
       viewfinder.src = videoURL;
       viewfinder.controls = false;
       
-      // Explicitly mute playback window by default on load
       viewfinder.muted = true;
       muteReviewBtn.innerText = "Muted";
       muteReviewBtn.classList.add('is-muted');
@@ -618,7 +627,6 @@
       actionBtn.innerText = "Play Review";
       actionBtn.className = "custom-png-btn";
       
-      // Reveal standard state Reset/Clear switch cleanly
       resetBtn.innerText = "Reset / Clear";
       resetBtn.className = "custom-png-btn";
       resetBtn.disabled = false;
@@ -627,7 +635,6 @@
       downloadBtn.style.display = "block";
       masterTimeline.classList.add('show');
 
-      // Keep videos clean and strictly paused on frame zero on load
       refVideo.pause();
       viewfinder.pause();
       refVideo.currentTime = 0;
@@ -648,7 +655,6 @@
     function synchronizeClocks() {
       if (isUserScrubbing || isSeeking) return;
 
-      // Handle custom continuous clip synchronization cleanly without autplaying
       if (viewfinder.ended || refVideo.ended || (viewfinder.duration && viewfinder.currentTime >= viewfinder.duration)) {
         refVideo.currentTime = 0;
         viewfinder.currentTime = 0;
@@ -662,7 +668,6 @@
         return;
       }
 
-      // Stop synchronization calculation loops if the player is cleanly stopped
       if (!isReviewPlaying) return;
 
       if (Math.abs(viewfinder.currentTime - refVideo.currentTime) > 0.15) {
@@ -723,7 +728,6 @@
     // --- RESET MANAGEMENT SYSTEM ---
     resetBtn.addEventListener('click', () => {
       if (!resetBtn.classList.contains('danger-active')) {
-        // Step 1: User clicks "Reset / Clear" -> UI toggles confirmation state
         resetBtn.classList.add('danger-active');
         resetBtn.innerText = "Confirm Reset?";
         setTimeout(() => {
@@ -733,7 +737,6 @@
           }
         }, 4000);
       } else {
-        // Step 2: Confirmation state is active and user clicks -> trigger complete system teardown
         resetBtn.classList.remove('danger-active');
         executeSystemReset();
       }
@@ -741,8 +744,8 @@
 
     function executeSystemReset() {
       clearInterval(loopInterval);
+      refVideo.removeEventListener('ended', handleVideoTrackFinished);
       
-      // Force stop layout windows immediately
       refVideo.pause();
       viewfinder.pause();
       refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
@@ -772,7 +775,6 @@
       actionBtn.innerText = "Start Session";
       actionBtn.className = "custom-png-btn";
       
-      // Cleanly reset structural display flags on conclusion
       resetBtn.innerText = "Reset / Clear";
       resetBtn.style.display = "none";
       resetBtn.disabled = true;
