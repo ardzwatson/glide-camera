@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V29.3)</title>
+  <title>Sync Performance Review (V29.4)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -213,6 +213,12 @@
     .timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #007aff; cursor: pointer; border: 2px solid white; }
     .time-display { font-family: 'Marcellus', serif; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
     
+    .ref-timeline-footer { width: 100%; height: 36px; display: none; align-items: center; gap: 12px; background: rgba(0,0,0,0.4); padding: 0 12px; box-sizing: border-box; border-radius: 8px; margin-bottom: 8px; flex-shrink: 0; }
+    .ref-timeline-footer.show { display: flex; }
+    .ref-timeline-slider { flex-grow: 1; -webkit-appearance: none; appearance: none; height: 6px; background: #333; border-radius: 3px; outline: none; }
+    .ref-timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #28a745; cursor: pointer; border: 2px solid white; }
+    .ref-time-display { font-family: 'Marcellus', serif; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
+    
     .mute-btn-container { display: flex; align-items: center; justify-content: center; }
     .mute-btn { font-family: 'Marcellus', serif; border: none; width: 90px; height: 32px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); background-color: #444; border-radius: 6px; }
     .mute-btn.is-muted { background-color: #ff453a; }
@@ -329,6 +335,11 @@
       </div>
     </div>
     
+    <div class="ref-timeline-footer" id="refTimeline">
+      <input type="range" id="refScrubSlider" class="ref-timeline-slider" min="0" max="100" step="0.1" value="0">
+      <div class="ref-time-display" id="refTimeLabel">0:00</div>
+    </div>
+    
     <div class="timeline-footer" id="masterTimeline">
       <input type="range" id="scrubSlider" class="timeline-slider" min="0" max="100" step="0.1" value="0">
       <div class="time-display" id="timeLabel">0:00</div>
@@ -353,7 +364,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V29.3</div>
+      <div class="version-tag">V29.4</div>
     </div>
   </div>
 
@@ -397,6 +408,9 @@
     const masterTimeline = document.getElementById('masterTimeline');
     const scrubSlider = document.getElementById('scrubSlider');
     const timeLabel = document.getElementById('timeLabel');
+    const refTimeline = document.getElementById('refTimeline');
+    const refScrubSlider = document.getElementById('refScrubSlider');
+    const refTimeLabel = document.getElementById('refTimeLabel');
 
     let mediaRecorder = null, recordedChunks = [], liveStream = null, isRecordingMode = false, isReviewMode = false, isReviewPlaying = false, isPreviewingRef = false, zoomFadeTimeout = null, isUserScrubbing = false, chosenScale = 1, currentVideoBlob = null, isSeeking = false;
     let overlayActive = true; 
@@ -480,7 +494,7 @@
       document.getElementById('appContent').style.display = 'none';
       
       reviewPlayer.muted = true; muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
-      masterTimeline.classList.remove('show'); downloadBtn.style.display = "none";
+      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show'); downloadBtn.style.display = "none";
       zoomSlider.value = 1; zoomLabel.innerText = "1.0x"; viewfinder.style.transform = "scale(1)";
       zoomUi.style.display = "flex"; recBadge.style.display = "none"; streamLabel.classList.remove('review-active');
       streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
@@ -533,6 +547,7 @@
         overlayToggleBtn.classList.remove('hidden');
         opacitySelector.classList.remove('hidden');
         masterTimeline.classList.remove('show');
+        refTimeline.classList.remove('show');
         previewRefBtn.classList.remove('hidden');
       }
     }
@@ -571,12 +586,22 @@
         previewRefBtn.classList.add('previewing');
         refLabel.innerHTML = `<span>REFERENCE LESSON (PREVIEWING)</span>`;
         refVideo.currentTime = 0;
+        
+        // Show reference timeline
+        if (refVideo.duration && isFinite(refVideo.duration) && refVideo.duration > 0) {
+          refScrubSlider.max = refVideo.duration;
+          refScrubSlider.value = 0;
+          updateRefTimeDisplay(0);
+          refTimeline.classList.add('show');
+        }
+        
         refVideo.play().catch(() => {});
       } else {
         isPreviewingRef = false;
         previewRefBtn.innerText = "Preview Ref";
         previewRefBtn.classList.remove('previewing');
         refVideo.pause();
+        refTimeline.classList.remove('show');
         setupInitialState();
       }
     });
@@ -649,7 +674,7 @@
         cameraOverlay.classList.add('hidden');
       }
       
-      masterTimeline.classList.remove('show');
+      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show');
 
       refVideo.addEventListener('ended', handleVideoTrackFinished);
 
@@ -728,8 +753,8 @@
       const playbackUrl = URL.createObjectURL(currentVideoBlob);
       reviewPlayer.src = playbackUrl;
       reviewPlayer.load();
-      
-      reviewPlayer.muted = false;
+       
+      reviewPlayer.muted = true;
 
       try {
        const audioSetupSuccess = setupIsolatedAudioPipeline(reviewPlayer);
@@ -738,12 +763,9 @@
          if (webAudioContext && webAudioContext.state !== 'suspended') {
            webAudioContext.suspend();
          }
-       } else {
-         reviewPlayer.muted = true;
        }
       } catch (e) {
        console.error('Audio setup error:', e);
-       reviewPlayer.muted = true;
       }
 
       muteReviewBtn.innerText = "Muted";
@@ -828,21 +850,21 @@
       if (!isReviewMode) return;
       
       if (muteReviewBtn.classList.contains('is-muted')) {
+        // Unmute: use both methods
+        reviewPlayer.muted = false;
         if (webAudioGainNode) {
           webAudioGainNode.gain.setValueAtTime(1, webAudioContext.currentTime);
           if (isReviewPlaying && webAudioContext.state === 'suspended') {
             webAudioContext.resume();
           }
-        } else {
-          reviewPlayer.muted = false;
         }
         muteReviewBtn.innerText = "Unmuted";
         muteReviewBtn.classList.remove('is-muted');
       } else {
+        // Mute: use both methods
+        reviewPlayer.muted = true;
         if (webAudioGainNode) {
           webAudioGainNode.gain.setValueAtTime(0, webAudioContext.currentTime);
-        } else {
-          reviewPlayer.muted = true;
         }
         muteReviewBtn.innerText = "Muted";
         muteReviewBtn.classList.add('is-muted');
@@ -948,6 +970,37 @@
       timeLabel.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     }
 
+    function updateRefTimeDisplay(seconds) {
+      if (isNaN(seconds) || !isFinite(seconds)) seconds = 0;
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      refTimeLabel.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    // Reference video timeline handlers
+    refScrubSlider.addEventListener('input', () => {
+      if (!isPreviewingRef) return;
+      const targetTime = parseFloat(refScrubSlider.value);
+      updateRefTimeDisplay(targetTime);
+      refVideo.currentTime = targetTime;
+    });
+
+    refVideo.addEventListener('timeupdate', () => {
+      if (isPreviewingRef && refVideo.duration && isFinite(refVideo.duration) && refVideo.duration > 0) {
+        if (!refScrubSlider.classList.contains('user-scrubbing')) {
+          refScrubSlider.value = refVideo.currentTime;
+          updateRefTimeDisplay(refVideo.currentTime);
+        }
+      }
+    });
+
+    refVideo.addEventListener('loadedmetadata', () => {
+      if (isPreviewingRef && refVideo.duration && isFinite(refVideo.duration) && refVideo.duration > 0) {
+        refScrubSlider.max = refVideo.duration;
+        refTimeline.classList.add('show');
+      }
+    });
+
     // Fixed slider interactions using synchronized layout-stable changes
     scrubSlider.addEventListener('input', () => {
       if (!isReviewMode) return;
@@ -1024,7 +1077,7 @@
       reviewPlayer.classList.remove('active-view');
       viewfinder.classList.add('active-view');
 
-      masterTimeline.classList.remove('show');
+      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show');
       downloadBtn.style.display = "none";
       zoomUi.style.display = "flex";
       resetBtn.style.display = "none";
