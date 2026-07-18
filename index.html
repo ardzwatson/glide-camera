@@ -28,7 +28,7 @@
       padding: 20px;
     }
     .gate-card {
-      background-image: url('https://lh3.googleusercontent.com/d/1B2Dk1T1vTjx0QaqoJIPZs9wvx09M60AG'); /* Animated GIF background */
+      background-image: url('https://lh3.googleusercontent.com/d/1B2Dk1T1vTjx0QaqoJIPZs9wvx09M60AG');
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
@@ -61,7 +61,7 @@
     .gate-input:focus { border-color: #ff453a; }
     
     .gate-btn {
-      position: relative; /* Create anchoring context for the absolute pseudo-element */
+      position: relative;
       width: 100%;
       height: 44px;
       background-color: transparent;
@@ -77,12 +77,10 @@
       align-items: center;
       justify-content: center;
       text-shadow: 0 1px 4px rgba(0,0,0,0.8);
-      overflow: hidden; /* Keep the pseudo-element image within the border radius bounds */
-      z-index: 1; /* Isolates stacking context so text stays on top */
+      overflow: hidden;
+      z-index: 1;
     }
     .gate-btn:active { transform: scale(0.98); filter: brightness(0.85); }
-
-    /* Target the background layer separately to apply opacity */
     .gate-btn::before {
       content: "";
       position: absolute;
@@ -91,8 +89,8 @@
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
-      opacity: 0.4; /* Set background image opacity to 40% */
-      z-index: -1; /* Layer it safely underneath your button text */
+      opacity: 0.4;
+      z-index: -1;
     }
     .gate-error { color: #ff453a; font-size: 12px; margin-top: 10px; display: none; }
 
@@ -103,10 +101,10 @@
       top: 50%;
       transform: translateY(-50%);
       z-index: 999;
-      background-color: rgba(0, 0, 0, 0.15); /* Black 15% opacity */
-      color: #ff453a; /* Sharp Red Text */
+      background-color: rgba(0, 0, 0, 0.15);
+      color: #ff453a;
       border: 1px solid rgba(255, 69, 58, 0.2);
-      border-left: none; /* Flush with edge */
+      border-left: none;
       border-radius: 0 8px 8px 0;
       padding: 14px 10px;
       font-family: 'Marcellus', serif;
@@ -115,17 +113,16 @@
       text-transform: uppercase;
       letter-spacing: 1px;
       cursor: pointer;
-      writing-mode: vertical-lr; /* Clean layout profile */
+      writing-mode: vertical-lr;
       transform-origin: left center;
       transition: background-color 0.2s ease, padding-left 0.2s ease;
-      display: none; /* Hidden until portal unlocks */
+      display: none;
     }
     #signOutBtn:hover {
       background-color: rgba(0, 0, 0, 0.35);
       padding-left: 14px;
     }
 
-    /* App content container (hidden until unlocked) */
     #appContent {
       display: none;
       flex-direction: column;
@@ -133,7 +130,7 @@
       height: 100%;
     }
 
-    /* --- ORIGINAL STYLES --- */
+    /* --- LAYOUT BOXES --- */
     .container { display: flex; flex-direction: column; gap: 12px; width: 100%; flex-grow: 1; min-height: 0; }
     @media (orientation: landscape) {
       body, html { padding: env(safe-area-inset-top, 4px) 8px calc(env(safe-area-inset-bottom, 0px) + 4px) 8px; }
@@ -157,8 +154,8 @@
       background: #000; 
       transition: transform 0.1s ease-out; 
       transform-origin: center center; 
-      -webkit-touch-callout: none; /* Prevents long-press menu on iOS Safari */
-      user-select: none;           /* Prevents selection */
+      -webkit-touch-callout: none;
+      user-select: none;
     }
     
     .viewfinder-overlay {
@@ -207,15 +204,15 @@
     .mute-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; border: none; width: 90px; height: 32px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); background-color: #444; border-radius: 6px; background-image: url('images/audio-on.png'); }
     .mute-btn.is-muted { background-color: #ff453a; background-image: url('images/audio-muted.png'); }
     
-    /* --- V26.1 BUTTON FOOTER (Resting opacity lowered by 15% -> 0.85) --- */
+    /* --- V26.1 BUTTON FOOTER --- */
     .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
     
     button.custom-png-btn, .custom-select-ui {
-      opacity: 0.85; /* Resting state lowered by 15% */
+      opacity: 0.85;
       transition: opacity 0.2s ease, transform 0.1s ease, filter 0.2s;
     }
     button.custom-png-btn:hover, .custom-select-ui:hover {
-      opacity: 1.0; /* Restore full clarity on hover */
+      opacity: 1.0;
     }
     
     button.custom-png-btn { font-family: 'Marcellus', serif; background-size: contain; background-repeat: no-repeat; background-position: center; background-color: transparent; border: none; width: 130px; height: 44px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; }
@@ -261,17 +258,17 @@
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%) rotate(-30deg); /* Anchors and angles text layout */
+      transform: translate(-50%, -50%) rotate(-30deg);
       transform-origin: center center;
-      pointer-events: none;
-      color: rgba(255, 255, 255, 0.7); /* Opacity elevated to 70% */
-      font-size: 24px; /* Increased sizing footprint */
+      pointer-events: none; /* FIXED: Clicks pass straight through layout boxes to the video player */
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 24px;
       font-weight: bold;
       font-family: 'Marcellus', serif;
       text-transform: uppercase;
       letter-spacing: 2px;
       z-index: 15;
-      white-space: nowrap; /* Keeps string on a clean singular line */
+      white-space: nowrap;
       text-shadow: 1px 1px 4px rgba(0,0,0,0.8);
       display: none;
       user-select: none;
@@ -313,7 +310,7 @@
   <!-- PERSISTENT LEFT SIGN-OUT BUTTON -->
   <button id="signOutBtn" onclick="handleSignOut()">Sign Out</button>
 
-  <!-- MAIN APP CONTAINER (Hidden initially) -->
+  <!-- MAIN APP CONTAINER -->
   <div id="appContent">
     <div class="container">
       <div class="box" id="videoBox" style="position: relative;">
@@ -327,7 +324,6 @@
         <!-- Floating Watermark -->
         <div id="videoWatermark"></div>
 
-        <!-- Security Notice Shield (Retained for structure, but focus hooks are disconnected) -->
         <div id="securityWarning">
           <h2>SECURITY NOTICE</h2>
           <p>Environment focus lost or screen capture attempt detected. Media playback has been suspended.</p>
@@ -376,7 +372,6 @@
   </div>
 
   <script>
-    // --- DATABASE & VARIABLE SYNC ---
     const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1fxQrloklFsVMvy1-hf5kouhH1w0N_gaPy26uA5jT7S8/gviz/tq?tqx=out:csv";
     
     let userDatabase = {}; 
@@ -413,7 +408,6 @@
     let overlayActive = true; 
     const PRE_RECORD_ALIGN_TIME = 20;
 
-    // --- 1. ACCESS KEY SYNC ENGINE (GOOGLE SHEETS) ---
     async function fetchAccessDatabase() {
       try {
         const response = await fetch(GOOGLE_SHEET_CSV_URL);
@@ -443,7 +437,6 @@
     }
     fetchAccessDatabase();
 
-    // --- 2. AUTHENTICATION & SIGN-OUT CONTROLLERS ---
     function unlockPortal() {
       const passInput = document.getElementById('gatePass');
       const input = passInput ? passInput.value.trim().toLowerCase() : "";
@@ -453,7 +446,7 @@
         
         document.getElementById('passwordGate').style.display = 'none';
         document.getElementById('appContent').style.display = 'flex';
-        signOutBtn.style.display = 'block'; // Show Sign Out button
+        signOutBtn.style.display = 'block';
         
         refVideo.src = "https://res.cloudinary.com/dgz4sxuj5/video/upload/v1782207187/Bandlab_EXAMPLE_-_ATAATA_pf2kik.mp4";
         
@@ -466,7 +459,6 @@
     }
 
     function handleSignOut() {
-      // 1. Clear intervals, timeouts, and stop active streams/recordings
       clearInterval(loopInterval);
       clearTimeout(zoomFadeTimeout);
       if (watermarkTimer) clearInterval(watermarkTimer);
@@ -475,19 +467,16 @@
         mediaRecorder.stop();
       }
       
-      // Stop webcam and mic streams gracefully
       if (liveStream) {
         liveStream.getTracks().forEach(track => track.stop());
       }
       
-      // 2. Clear state variables
       isRecordingMode = false;
       isReviewMode = false;
       recordedChunks = [];
       currentVideoBlob = null;
       chosenScale = 1;
       
-      // 3. Reset UI element properties
       refVideo.pause();
       refVideo.removeAttribute('src');
       refVideo.load();
@@ -501,7 +490,6 @@
       
       document.getElementById('appContent').style.display = 'none';
       
-      // 4. Reset footer panels and indicators
       viewfinder.muted = true;
       muteReviewBtn.innerText = "Muted";
       muteReviewBtn.classList.add('is-muted');
@@ -531,7 +519,6 @@
       resetBtn.disabled = true;
       resetBtn.style.display = "none";
       
-      // 5. Unveil Password Gate
       const passInput = document.getElementById('gatePass');
       if (passInput) passInput.value = '';
       document.getElementById('passwordGate').style.display = 'flex';
@@ -541,51 +528,21 @@
       if (e.key === 'Enter') unlockPortal();
     });
 
-    // --- 3. HARDENED WATERMARK ENGINE ---
     function startWatermarkEngine() {
       watermarkEl.innerText = `${authorizedUser} • DRAFT PREVIEW`;
       watermarkEl.style.display = 'block';
-      
-      // Coordinate vector random shuffling logic removed to lock the CSS center-diagonal layout properties safely in place.
-      const moveWatermark = () => {
-        // Intercepted to preserve static diagonal styling rules
-      };
-      
-      moveWatermark();
     }
 
-    // --- 4. SECURE ISOLATION SHIELD (GAZE DISCONNECTED IN V26.1) ---
-    // Security notice popup is deactivated during page blurs or window unfocuses.
     window.addEventListener('blur', () => {
       console.log("V26.1 Update: Tab/Window blur event captured. Gaze alert bypassed.");
     });
 
-    function triggerSecurityBreach() {
-      // Intentionally bypassed in V26.1
-    }
-
-    function dismissWarning() {
-      warningEl.style.display = 'none';
-    }
-
-    // Key intercept blocks (PrintScreen, standard shortcuts)
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'PrintScreen') {
-        e.preventDefault();
-        console.log("V26.1 Update: Screenshot attempt registered.");
-      }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
-        console.log("V26.1 Update: Shortcut vector intercepted.");
-      }
-    });
-
-    // Browser Context Menu Blockers
+    // FIXED: The removeAttribute line that was immediately dropping the stream source has been safely disabled.
     refVideo.addEventListener('contextmenu', (e) => e.preventDefault());
     refVideo.addEventListener('canplaythrough', () => {
-      refVideo.removeAttribute('src'); // Stripping explicit media URI after memory stream buffer handoff
+      // refVideo.removeAttribute('src'); // Commented out to prevent lifecycle stream disruption
     }, { once: true });
 
-    // --- 5. SYSTEM CAMERA CORE ---
     async function initCamera() {
       try { 
         liveStream = await navigator.mediaDevices.getUserMedia({ 
