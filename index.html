@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V29.9 - Phantom Samurai)</title>
+  <title>Kapa Sync Video Review (V30.0-Demon's Blade)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -145,6 +145,10 @@
       .rec-indicator { right: 6px !important; left: auto !important; }
       .zoom-container { bottom: 6px !important; padding: 4px 8px !important; }
       .timeline-footer { height: 28px !important; margin-top: 4px !important; gap: 8px !important; }
+      .sync-offset-row { height: 28px !important; margin-top: 4px !important; gap: 6px !important; }
+      .sync-offset-label { display: none; }
+      .offset-btn { width: 26px !important; height: 22px !important; font-size: 13px !important; }
+      .offset-value { font-size: 11px !important; min-width: 42px !important; padding: 3px !important; }
       .controls-footer { height: 42px !important; margin-top: 4px !important; gap: 6px !important; }
       button.custom-png-btn, .custom-select-ui { width: 95px !important; height: 34px !important; font-size: 10px !important; }
       .mute-btn-container button { width: 80px !important; height: 26px !important; }
@@ -269,6 +273,62 @@
     .custom-select-ui:disabled { opacity: 0.4; cursor: not-allowed; }
 
     #downloadBtn { background-color: #34c759; border-radius: 8px; display: none; }
+    #downloadBtn.save-pending { background-color: #ff9500; }
+    #downloadBtn.save-error { background-color: #ff3b30; }
+
+    .sync-offset-row {
+      width: 100%;
+      height: 40px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: rgba(0,0,0,0.4);
+      padding: 0 12px;
+      box-sizing: border-box;
+      border-radius: 8px;
+      margin-top: 8px;
+      flex-shrink: 0;
+    }
+    .sync-offset-row.show { display: flex; }
+    .sync-offset-label { font-family: 'Marcellus', serif; font-size: 10px; color: #aaa; letter-spacing: 0.5px; }
+    .offset-btn {
+      font-family: 'Marcellus', serif;
+      width: 34px;
+      height: 30px;
+      border: none;
+      border-radius: 6px;
+      background-color: #3a3a3c;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: filter 0.15s, transform 0.1s;
+    }
+    .offset-btn:active { transform: scale(0.94); filter: brightness(0.85); }
+    .offset-value {
+      font-family: 'Marcellus', serif;
+      font-size: 13px;
+      font-weight: bold;
+      color: #007aff;
+      min-width: 56px;
+      text-align: center;
+      background: #1c1c1e;
+      border: 1px solid #3a3a3c;
+      border-radius: 6px;
+      padding: 6px 4px;
+    }
+
+    .gate-build-tag {
+      margin-top: 24px;
+      font-size: 10px;
+      color: #48484a;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
     .version-tag { color: #556; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: 'Marcellus', serif; position: absolute; right: 4px; }
     .countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: #fff; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
     .countdown-overlay.show { opacity: 1; }
@@ -301,8 +361,9 @@
       <h2>SECURE PORTAL</h2>
       <p>Please enter your access key to begin.</p>
       <input type="password" id="gatePass" class="gate-input" placeholder="••••••••" autofocus>
-      <button onclick="unlockPortal()" class="gate-btn">Unlock</button>
+      <button onclick="unlockPortal()" class="gate-btn">Tahuna Te Ahi</button>
       <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
+      <div class="gate-build-tag">v30.0 - Demon's Blade Build</div>
     </div>
   </div>
 
@@ -312,11 +373,11 @@
   <div id="appContent">
     <div class="container">
       <div class="box" id="videoBox">
-        <div class="label" id="refLabel">REFERENCE VIDEO</div>
+        <div class="label" id="refLabel">REFERENCE LESSON</div>
         
         <div id="refVideoContainer">
           <video id="refVideo" 
-                 poster="https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg" 
+                 poster="https://vz-1e14ed9f-aa1.b-cdn.net/ed64b70f-c2ab-4fd9-acde-98b43fa4868e/thumbnail.jpg" 
                  preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
         </div>
         
@@ -347,6 +408,13 @@
       <div class="time-display" id="timeLabel">0:00</div>
       <div class="mute-btn-container"><button class="mute-btn is-muted" id="muteReviewBtn">Muted</button></div>
     </div>
+
+    <div class="sync-offset-row" id="syncOffsetRow">
+      <span class="sync-offset-label">Cam Delay Offset</span>
+      <button type="button" class="offset-btn" id="offsetMinusBtn">−</button>
+      <div class="offset-value" id="offsetValueDisplay">0.0s</div>
+      <button type="button" class="offset-btn" id="offsetPlusBtn">+</button>
+    </div>
     
     <div class="controls-footer">
       <button id="previewRefBtn" class="custom-png-btn">Preview Ref</button>
@@ -366,14 +434,18 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V29.7</div>
+      <div class="version-tag">V30.0</div>
     </div>
   </div>
 
   <script>
     const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1fxQrloklFsVMvy1-hf5kouhH1w0N_gaPy26uA5jT7S8/gviz/tq?tqx=out:csv";
-    const BUNNY_HLS_URL = "https://vz-1e14ed9f-aa1.b-cdn.net/ed64b70f-c2ab-4fd9-acde-98b43fa4868e/playlist.m3u8";
-    const THUMBNAIL_ASSET = "https://vz-1e14ed9f-aa1.b-cdn.net/ed64b70f-c2ab-4fd9-acde-98b43fa4868e/thumbnail.jpg";
+    // Fallback video shown if a user's sheet row leaves the HLS/Thumbnail columns blank.
+    const DEFAULT_HLS_URL = "https://vz-1e14ed9f-aa1.b-cdn.net/ed64b70f-c2ab-4fd9-acde-98b43fa4868e/playlist.m3u8";
+    const DEFAULT_THUMBNAIL_URL = "https://vz-1e14ed9f-aa1.b-cdn.net/ed64b70f-c2ab-4fd9-acde-98b43fa4868e/thumbnail.jpg";
+    // The video actually loaded for the current session - set per-user at unlock time.
+    let activeHlsUrl = DEFAULT_HLS_URL;
+    let activeThumbnailUrl = DEFAULT_THUMBNAIL_URL;
     
     let userDatabase = {}; 
     let authorizedUser = "";
@@ -413,15 +485,135 @@
     const refTimeline = document.getElementById('refTimeline');
     const refScrubSlider = document.getElementById('refScrubSlider');
     const refTimeLabel = document.getElementById('refTimeLabel');
+    const syncOffsetRow = document.getElementById('syncOffsetRow');
+    const offsetMinusBtn = document.getElementById('offsetMinusBtn');
+    const offsetPlusBtn = document.getElementById('offsetPlusBtn');
+    const offsetValueDisplay = document.getElementById('offsetValueDisplay');
 
     let mediaRecorder = null, recordedChunks = [], liveStream = null, isRecordingMode = false, isReviewMode = false, isReviewPlaying = false, isPreviewingRef = false, zoomFadeTimeout = null, isUserScrubbing = false, chosenScale = 1, currentVideoBlob = null, isSeeking = false;
     let reviewPlaybackUrl = null, ffmpegInstance = null, ffmpegLoadPromise = null, isConverting = false, ffmpegProgressHandler = null;
     let overlayActive = true; 
     const PRE_RECORD_ALIGN_TIME = 20;
 
+    // --- Countdown tone ---
+    // Uses the Web Audio API to synthesize short beeps rather than loading an
+    // external audio file, so there's nothing to fetch and no CORS/offline issues.
+    // The context is created inside the "Start Session" click handler chain
+    // (startCountdown -> playCountdownBeep), which counts as a user gesture and
+    // satisfies iOS/Chrome autoplay policies.
+    let countdownAudioContext = null;
+
+    function playCountdownBeep(frequency, duration) {
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        if (!countdownAudioContext) countdownAudioContext = new AudioContextClass();
+        if (countdownAudioContext.state === 'suspended') countdownAudioContext.resume().catch(() => {});
+
+        const ctx = countdownAudioContext;
+        const startTime = ctx.currentTime;
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(frequency, startTime);
+        gainNode.gain.setValueAtTime(0, startTime);
+        gainNode.gain.linearRampToValueAtTime(0.35, startTime + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        oscillator.start(startTime);
+        oscillator.stop(startTime + duration + 0.02);
+      } catch (e) {
+        console.warn('Countdown tone failed:', e);
+      }
+    }
+
+    // --- Manual sync offset (cam delay compensation) ---
+    // Lets the user nudge the reference video's target time relative to the
+    // recorded camera clip if they perceive a consistent lag between the two on
+    // playback. Positive values push the reference video further ahead in time;
+    // negative values pull it back.
+    let syncOffsetSeconds = 0;
+    const SYNC_OFFSET_STEP = 0.1;
+    const SYNC_OFFSET_MIN = -5;
+    const SYNC_OFFSET_MAX = 5;
+
+    function clampRefTime(t) {
+      const max = (refVideo.duration && isFinite(refVideo.duration)) ? refVideo.duration : Infinity;
+      return Math.max(0, Math.min(t, max));
+    }
+
+    // Given the camera/review clip's current time, returns where the reference
+    // video should be, accounting for the manual offset.
+    function getTargetRefTime(camTime) {
+      return clampRefTime(camTime + syncOffsetSeconds);
+    }
+
+    function updateOffsetDisplay() {
+      const rounded = Math.round(syncOffsetSeconds * 10) / 10;
+      const sign = rounded > 0 ? '+' : '';
+      offsetValueDisplay.innerText = `${sign}${rounded.toFixed(1)}s`;
+    }
+
+    function resetSyncOffset() {
+      syncOffsetSeconds = 0;
+      updateOffsetDisplay();
+    }
+
+    function adjustSyncOffset(delta) {
+      syncOffsetSeconds = Math.max(SYNC_OFFSET_MIN, Math.min(SYNC_OFFSET_MAX, syncOffsetSeconds + delta));
+      updateOffsetDisplay();
+      // Re-anchor immediately so the change is felt right away instead of waiting
+      // for the next drift-correction tick.
+      if (isReviewMode) {
+        refVideo.currentTime = getTargetRefTime(reviewPlayer.currentTime);
+      }
+    }
+
+    offsetMinusBtn.addEventListener('click', () => adjustSyncOffset(-SYNC_OFFSET_STEP));
+    offsetPlusBtn.addEventListener('click', () => adjustSyncOffset(SYNC_OFFSET_STEP));
+
+    // --- Save/Share state ---
+    // A blob+filename that is ready to be written to disk/shared, waiting on a fresh
+    // user tap (mobile browsers require the actual save/share call to happen inside
+    // a "live" user gesture - if too much async time has passed since the tap that
+    // started conversion, the call silently does nothing on iOS Safari especially).
+    let pendingSaveBlob = null;
+    let pendingSaveFilename = null;
+    const FFMPEG_LOAD_TIMEOUT_MS = 45000;
+    const FFMPEG_CONVERT_TIMEOUT_MS = 120000;
+
     refVideo.addEventListener('loadstart', () => {
-      refVideo.setAttribute('poster', THUMBNAIL_ASSET);
+      refVideo.setAttribute('poster', activeThumbnailUrl);
     });
+
+    // Handles quoted fields (so commas inside a URL's query string, if any,
+    // don't get mistaken for column separators) - the naive .split(',') this
+    // replaces would silently mis-parse rows like that.
+    function parseCsvLine(line) {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (inQuotes) {
+          if (char === '"') {
+            if (line[i + 1] === '"') { current += '"'; i++; }
+            else { inQuotes = false; }
+          } else {
+            current += char;
+          }
+        } else {
+          if (char === '"') { inQuotes = true; }
+          else if (char === ',') { result.push(current); current = ''; }
+          else { current += char; }
+        }
+      }
+      result.push(current);
+      return result.map(v => v.trim());
+    }
 
     async function fetchAccessDatabase() {
       try {
@@ -430,8 +622,23 @@
         const csvText = await response.text();
         const lines = csvText.split(/\r?\n/);
         lines.forEach(line => {
-          const columns = line.split(',').map(col => col.replace(/^"|"$/g, '').trim());
-          if (columns[0] && columns[1]) userDatabase[columns[0].toLowerCase()] = columns[1];
+          if (!line.trim()) return;
+          const columns = parseCsvLine(line);
+          const passcode = (columns[0] || '').toLowerCase();
+          const name = columns[1] || '';
+          const hlsUrl = (columns[2] || '').trim();
+          const thumbnailUrl = (columns[3] || '').trim();
+
+          if (!passcode || !name) return;
+          if (passcode === 'passcode' || passcode === 'passcodes') return; // skip a header row if present
+
+          // HLS URL/Thumbnail URL are optional per row - rows that leave them
+          // blank fall back to the default reference video.
+          userDatabase[passcode] = {
+            name,
+            hlsUrl: hlsUrl || null,
+            thumbnailUrl: thumbnailUrl || null
+          };
         });
         if (gateError) { gateError.style.display = 'none'; gateError.innerText = "Incorrect passcode. Please try again."; }
       } catch (err) {
@@ -443,25 +650,78 @@
     function unlockPortal() {
       const passInput = document.getElementById('gatePass');
       const input = passInput ? passInput.value.trim().toLowerCase() : "";
-      if (userDatabase[input]) {
-        authorizedUser = userDatabase[input];
+      const userRecord = userDatabase[input];
+      if (userRecord) {
+        authorizedUser = userRecord.name;
+        activeHlsUrl = userRecord.hlsUrl || DEFAULT_HLS_URL;
+        activeThumbnailUrl = userRecord.thumbnailUrl || DEFAULT_THUMBNAIL_URL;
+
         document.getElementById('passwordGate').style.display = 'none';
         document.getElementById('appContent').style.display = 'flex';
         signOutBtn.style.display = 'block';
+
+        // Apply this user's specific reference video's poster/thumbnail everywhere
+        // it's used - the video poster and the translucent camera alignment guide.
+        refVideo.setAttribute('poster', activeThumbnailUrl);
+        cameraOverlay.style.backgroundImage = `url('${activeThumbnailUrl}')`;
         
         if (Hls.isSupported()) {
           hlsInstance = new Hls({
             enableWorker: true,
-            lowLatencyMode: true,
+            lowLatencyMode: false,   // this is a fixed VOD lesson clip, not a live stream -
+                                      // low-latency mode adds segment-timing overhead with no
+                                      // benefit here and can itself introduce buffering hiccups
             maxBufferLength: 30,
-            maxMaxBufferLength: 600, // FIXED: Buffer retention increased
-            backBufferLength: 90,    // FIXED: Keeps back buffer in memory for looping
-            appendErrorMaxRetry: 5
+            maxMaxBufferLength: 90,  // trimmed from 600s - holding ~10 minutes of buffer was
+                                      // memory-heavy on mobile and could cause GC-driven stutter
+            backBufferLength: 60,    // still generous enough to avoid refetching on backward
+                                      // seeks/loops, without the earlier extreme retention
+            capLevelToPlayerSize: true, // don't fetch a higher-res rendition than the small
+                                         // preview box actually needs
+            appendErrorMaxRetry: 5,
+            maxFragLookUpTolerance: 0.2
           });
-          hlsInstance.loadSource(BUNNY_HLS_URL);
+
+          // The reference clip plays small and fixed-size, so lock to a single
+          // rendition instead of letting ABR switch quality mid-playback. A
+          // quality switch means swapping renditions mid-stream, which is exactly
+          // what shows up as a "random" glitch/freeze that isn't tied to anything
+          // the user did.
+          hlsInstance.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+            if (data.levels && data.levels.length > 1) {
+              let bestIndex = 0;
+              let bestHeight = Infinity;
+              data.levels.forEach((level, index) => {
+                if (level.height && level.height < bestHeight && level.height >= 240) {
+                  bestHeight = level.height;
+                  bestIndex = index;
+                }
+              });
+              hlsInstance.currentLevel = bestIndex;
+            }
+          });
+
+          // Auto-recover from stalls/errors instead of leaving playback stuck.
+          hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+            if (!data.fatal) return;
+            console.warn('HLS fatal error:', data.type, data.details);
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                hlsInstance.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                hlsInstance.recoverMediaError();
+                break;
+              default:
+                hlsInstance.destroy();
+                break;
+            }
+          });
+
+          hlsInstance.loadSource(activeHlsUrl);
           hlsInstance.attachMedia(refVideo);
         } else if (refVideo.canPlayType('application/vnd.apple.mpegurl')) {
-          refVideo.src = BUNNY_HLS_URL;
+          refVideo.src = activeHlsUrl;
         }
         startWatermarkEngine();
         initCamera();
@@ -480,8 +740,11 @@
       if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
       
       isRecordingMode = false; isReviewMode = false; isReviewPlaying = false; isPreviewingRef = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1; isSeeking = false; isConverting = false;
+      pendingSaveBlob = null; pendingSaveFilename = null;
+      activeHlsUrl = DEFAULT_HLS_URL; activeThumbnailUrl = DEFAULT_THUMBNAIL_URL;
+      cameraOverlay.style.backgroundImage = '';
       if (reviewPlaybackUrl) { URL.revokeObjectURL(reviewPlaybackUrl); reviewPlaybackUrl = null; }
-      refVideo.pause(); refVideo.removeAttribute('src'); refVideo.setAttribute('poster', THUMBNAIL_ASSET); refVideo.load();
+      refVideo.pause(); refVideo.removeAttribute('src'); refVideo.setAttribute('poster', DEFAULT_THUMBNAIL_URL); refVideo.load();
       
       viewfinder.pause(); 
       viewfinder.srcObject = null;
@@ -498,8 +761,8 @@
       document.getElementById('appContent').style.display = 'none';
       
       reviewPlayer.muted = true; muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
-      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show'); downloadBtn.style.display = "none";
-      downloadBtn.disabled = false; downloadBtn.innerText = "Save";
+      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show'); syncOffsetRow.classList.remove('show'); resetSyncOffset(); downloadBtn.style.display = "none";
+      downloadBtn.disabled = false; downloadBtn.innerText = "Save"; downloadBtn.classList.remove('save-pending', 'save-error');
       zoomSlider.value = 1; zoomLabel.innerText = "1.0x"; viewfinder.style.transform = "scale(1)";
       zoomUi.style.display = "flex"; recBadge.style.display = "none"; streamLabel.classList.remove('review-active');
       streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
@@ -517,7 +780,7 @@
     document.getElementById('gatePass').addEventListener('keypress', function(e) { if (e.key === 'Enter') unlockPortal(); });
 
     function startWatermarkEngine() {
-      watermarkEl.innerText = `${authorizedUser} • DRAFT PREVIEW`;
+      watermarkEl.innerText = `${authorizedUser} • 07-2026`;
       watermarkEl.style.display = 'block';
       const moveWatermark = () => {
         const container = refVideo.parentElement;
@@ -584,14 +847,15 @@
 
     previewRefBtn.addEventListener('click', () => {
       if (isRecordingMode || isReviewMode) return;
-      
+
       if (!isPreviewingRef) {
+        // First tap: enter preview mode fresh, starting from the top.
         isPreviewingRef = true;
         previewRefBtn.innerText = "Pause Preview";
         previewRefBtn.classList.add('previewing');
         refLabel.innerHTML = `<span>REFERENCE LESSON (PREVIEWING)</span>`;
         refVideo.currentTime = 0;
-        
+
         // Show reference timeline
         if (refVideo.duration && isFinite(refVideo.duration) && refVideo.duration > 0) {
           refScrubSlider.max = refVideo.duration;
@@ -599,15 +863,16 @@
           updateRefTimeDisplay(0);
           refTimeline.classList.add('show');
         }
-        
+
         refVideo.play().catch(() => {});
-      } else {
-        isPreviewingRef = false;
-        previewRefBtn.innerText = "Preview Ref";
-        previewRefBtn.classList.remove('previewing');
+      } else if (!refVideo.paused) {
+        // Already previewing and playing: pause in place, don't reset position.
         refVideo.pause();
-        refTimeline.classList.remove('show');
-        setupInitialState();
+        previewRefBtn.innerText = "Resume Preview";
+      } else {
+        // Already previewing and paused: resume from exactly where it left off.
+        refVideo.play().catch(() => {});
+        previewRefBtn.innerText = "Pause Preview";
       }
     });
 
@@ -638,13 +903,17 @@
       refVideo.currentTime = 0;
       refVideo.pause();
 
+      playCountdownBeep(660, 0.12); // tick for the initial "3"
+
       const interval = setInterval(() => {
         count--;
         if (count > 0) {
           countdown.innerText = count;
+          playCountdownBeep(660, 0.12); // tick for "2" and "1"
         } else {
           clearInterval(interval);
           countdown.classList.remove('show');
+          playCountdownBeep(1046, 0.22); // higher "go" tone right as recording starts
           startRecordingSession();
         }
       }, 1000);
@@ -659,6 +928,9 @@
     function startRecordingSession() {
       isRecordingMode = true;
       recordedChunks = [];
+      pendingSaveBlob = null;
+      pendingSaveFilename = null;
+      resetSyncOffset();
       
       recBadge.style.display = "block";
       refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
@@ -679,15 +951,18 @@
         cameraOverlay.classList.add('hidden');
       }
       
-      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show');
+      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show'); syncOffsetRow.classList.remove('show');
 
       refVideo.addEventListener('ended', handleVideoTrackFinished);
 
-      let mimeType = 'video/webm;codecs=vp9,opus';
+      let mimeType = 'video/mp4';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'video/webm;codecs=vp8,opus';
+        mimeType = 'video/webm;codecs=vp9,opus';
         if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : '';
+          mimeType = 'video/webm;codecs=vp8,opus';
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : '';
+          }
         }
       }
       const options = mimeType ? { mimeType } : {};
@@ -702,9 +977,13 @@
 
         refVideo.currentTime = 0;
         refVideo.play().then(() => {
-          mediaRecorder.start();
+          // A timeslice makes the recorder flush chunks periodically instead of
+          // writing everything as one giant blob on stop() - the single-blob
+          // path is more prone to a malformed/truncated tail on mobile, which is
+          // the classic cause of "freezes near the end, holds the last frame."
+          mediaRecorder.start(1000);
         }).catch(() => {
-          mediaRecorder.start();
+          mediaRecorder.start(1000);
         });
       } catch (err) {
         isRecordingMode = false;
@@ -726,10 +1005,39 @@
       }
     }
 
+    // MediaRecorder blobs (especially WebM on Chrome/Android) frequently report
+    // an incorrect duration - it can read as Infinity, or as a value that runs
+    // longer than the actual decodable content. Left as-is, the video appears
+    // to "freeze" on the last real frame while playback keeps counting up
+    // toward a duration that doesn't match what was actually recorded, right
+    // up until it finally fires 'ended'. Seeking near the very end forces the
+    // browser to recompute the real duration from the actual data - this is
+    // the standard, widely-used workaround for this specific browser behavior.
+    function fixRecordedVideoDuration(videoEl, timeoutMs = 2000) {
+      return new Promise((resolve) => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          videoEl.removeEventListener('timeupdate', onTimeUpdate);
+          resolve(isFinite(videoEl.duration) ? videoEl.duration : 0);
+        };
+        const onTimeUpdate = () => {
+          videoEl.currentTime = 0;
+          finish();
+        };
+        videoEl.addEventListener('timeupdate', onTimeUpdate);
+        videoEl.currentTime = 1e101;
+        setTimeout(finish, timeoutMs); // safety net in case timeupdate never fires
+      });
+    }
+
     function setupReviewModePipeline() {
       isReviewMode = true;
       isReviewPlaying = false;
       isSeeking = false;
+      pendingSaveBlob = null;
+      pendingSaveFilename = null;
 
       actionBtn.innerText = "Play Review";
       actionBtn.className = "custom-png-btn";
@@ -743,6 +1051,7 @@
       downloadBtn.style.display = "block";
       downloadBtn.disabled = false;
       downloadBtn.innerText = "Save";
+      downloadBtn.classList.remove('save-pending', 'save-error');
       isConverting = false;
       previewRefBtn.classList.add('hidden');
 
@@ -790,24 +1099,24 @@
       muteReviewBtn.classList.add('is-muted');
 
       reviewPlayer.onloadedmetadata = () => {
-        let recordedDuration = reviewPlayer.duration;
-        
-        if (recordedDuration === Infinity || recordedDuration === 0 || isNaN(recordedDuration)) {
-          recordedDuration = 0;
-        }
-        
-        scrubSlider.max = recordedDuration;
-        scrubSlider.value = 0;
-        updateTimeDisplayLabel(0);
-        masterTimeline.classList.add('show');
-        
-        reviewPlayer.pause();
-        refVideo.currentTime = 0;
-        refVideo.pause();
+        fixRecordedVideoDuration(reviewPlayer).then((recordedDuration) => {
+          scrubSlider.max = recordedDuration;
+          scrubSlider.value = 0;
+          updateTimeDisplayLabel(0);
+          masterTimeline.classList.add('show');
+          syncOffsetRow.classList.add('show');
+
+          reviewPlayer.pause();
+          refVideo.currentTime = 0;
+          refVideo.pause();
+        });
       };
 
       reviewPlayer.onprogress = () => {
-        const validDuration = reviewPlayer.duration && isFinite(reviewPlayer.duration) && reviewPlayer.duration > 0;
+        // Cap out unreasonable values - during the duration-fix seek (currentTime
+        // jumped to 1e101), the browser can transiently report a huge/garbage
+        // duration before it settles on the real one.
+        const validDuration = reviewPlayer.duration && isFinite(reviewPlayer.duration) && reviewPlayer.duration > 0 && reviewPlayer.duration < 10800;
         const sliderMaxSet = parseFloat(scrubSlider.max);
         
         if (validDuration && (sliderMaxSet === 0 || Math.abs(scrubSlider.max - reviewPlayer.duration) > 0.1)) {
@@ -899,7 +1208,7 @@
       }
 
       const targetTime = reviewPlayer.currentTime;
-      refVideo.currentTime = targetTime;
+      refVideo.currentTime = getTargetRefTime(targetTime);
 
       const playPromises = [
         refVideo.play().catch(e => console.warn('RefVideo play error:', e)),
@@ -930,7 +1239,7 @@
       
       // FIXED: Soft seek stabilizes the HLS buffer
       reviewPlayer.currentTime = 0.1;
-      refVideo.currentTime = 0.1;
+      refVideo.currentTime = getTargetRefTime(0.1);
       scrubSlider.value = 0;
       updateTimeDisplayLabel(0);
       
@@ -957,19 +1266,42 @@
 
     function initializePerformanceReviewClock() {
       let activeAnimationFrameId = null;
+      let lastHardSeekAt = 0;
+
+      // refVideo is an HLS stream, so every currentTime write can trigger a
+      // rebuffer/keyframe search that shows up as a visible glitch or freeze.
+      // reviewPlayer is a local blob, so it's cheap to seek freely. To keep the
+      // two in sync without that glitching:
+      //  - small drift (SOFT_SYNC..HARD_SYNC) is corrected by gently nudging
+      //    refVideo's playbackRate, which is invisible to the eye
+      //  - only drift beyond HARD_SYNC forces an actual seek, and even then
+      //    it's rate-limited so it can't fire on back-to-back frames
+      const SOFT_SYNC_THRESHOLD = 0.08;
+      const HARD_SYNC_THRESHOLD = 0.6;
+      const MIN_HARD_SEEK_INTERVAL_MS = 800;
 
       function step() {
         if (!isReviewMode) {
           if (activeAnimationFrameId) cancelAnimationFrame(activeAnimationFrameId);
+          refVideo.playbackRate = 1;
           return;
         }
 
         if (isReviewPlaying && !isUserScrubbing && !isSeeking) {
           const currentCamTime = reviewPlayer.currentTime;
-          
-          // FIXED: Relaxed threshold prevents continuous micro-seeking and stuttering
-          if (Math.abs(refVideo.currentTime - currentCamTime) > 0.25) {
-            refVideo.currentTime = currentCamTime;
+          const targetRefTime = getTargetRefTime(currentCamTime);
+          const drift = targetRefTime - refVideo.currentTime;
+          const absDrift = Math.abs(drift);
+          const now = performance.now();
+
+          if (absDrift > HARD_SYNC_THRESHOLD && (now - lastHardSeekAt) > MIN_HARD_SEEK_INTERVAL_MS) {
+            refVideo.currentTime = targetRefTime;
+            refVideo.playbackRate = 1;
+            lastHardSeekAt = now;
+          } else if (absDrift > SOFT_SYNC_THRESHOLD) {
+            refVideo.playbackRate = drift > 0 ? 1.06 : 0.94;
+          } else if (refVideo.playbackRate !== 1) {
+            refVideo.playbackRate = 1;
           }
 
           scrubSlider.value = currentCamTime;
@@ -1020,21 +1352,31 @@
     });
 
     // Fixed slider interactions using synchronized layout-stable changes
+    let scrubRefSeekTimer = null;
     scrubSlider.addEventListener('input', () => {
       if (!isReviewMode) return;
       isUserScrubbing = true;
       isSeeking = true;
       const targetTime = parseFloat(scrubSlider.value);
       updateTimeDisplayLabel(targetTime);
-      
+
+      // reviewPlayer is a local blob - cheap to seek on every tick for responsive feedback.
       reviewPlayer.currentTime = targetTime;
-      refVideo.currentTime = targetTime;
+
+      // refVideo is HLS - seeking on every drag tick causes a seek storm that stalls/glitches
+      // while buffering. Throttle it so it only actually seeks a few times per second.
+      if (scrubRefSeekTimer) clearTimeout(scrubRefSeekTimer);
+      scrubRefSeekTimer = setTimeout(() => {
+        refVideo.currentTime = getTargetRefTime(targetTime);
+      }, 120);
     });
 
     scrubSlider.addEventListener('change', () => {
       if (!isReviewMode) return;
       const targetTime = parseFloat(scrubSlider.value);
-      
+
+      if (scrubRefSeekTimer) { clearTimeout(scrubRefSeekTimer); scrubRefSeekTimer = null; }
+
       let pendingSeeks = 2;
       const checkSeekDone = () => {
         pendingSeeks--;
@@ -1050,8 +1392,9 @@
         }
       };
 
+      const targetRefTime = getTargetRefTime(targetTime);
       reviewPlayer.fastSeek ? reviewPlayer.fastSeek(targetTime) : (reviewPlayer.currentTime = targetTime);
-      refVideo.fastSeek ? refVideo.fastSeek(targetTime) : (refVideo.currentTime = targetTime);
+      refVideo.fastSeek ? refVideo.fastSeek(targetRefTime) : (refVideo.currentTime = targetRefTime);
 
       setTimeout(checkSeekDone, 40);
       setTimeout(checkSeekDone, 40);
@@ -1085,6 +1428,9 @@
       isPreviewingRef = false;
       recordedChunks = [];
       currentVideoBlob = null;
+      pendingSaveBlob = null;
+      pendingSaveFilename = null;
+      isConverting = false;
       if (reviewPlaybackUrl) { URL.revokeObjectURL(reviewPlaybackUrl); reviewPlaybackUrl = null; }
 
       // Unload playback track safely
@@ -1098,10 +1444,12 @@
       reviewPlayer.style.transform = 'scale(1)';
 
       masterTimeline.classList.remove('show'); refTimeline.classList.remove('show');
+      syncOffsetRow.classList.remove('show');
+      resetSyncOffset();
       downloadBtn.style.display = "none";
       downloadBtn.disabled = false;
       downloadBtn.innerText = "Save";
-      isConverting = false;
+      downloadBtn.classList.remove('save-pending', 'save-error');
       zoomUi.style.display = "flex";
       resetBtn.style.display = "none";
       resetBtn.disabled = true;
@@ -1125,7 +1473,7 @@
       setupInitialState();
     }
 
-    function generateSaveFilename() {
+    function generateSaveFilename(ext) {
       const displayName = (authorizedUser || 'User')
         .trim()
         .split(/\s+/)
@@ -1135,7 +1483,15 @@
       const now = new Date();
       const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const time = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-      return `${displayName}_Performance_Review_${date}_${time}.mp4`;
+      return `${displayName}_Performance_Review_${date}_${time}.${ext || 'mp4'}`;
+    }
+
+    function withTimeout(promise, ms, message) {
+      let timer;
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message || 'Operation timed out')), ms);
+      });
+      return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
     }
 
     async function loadFFmpeg() {
@@ -1144,16 +1500,20 @@
 
       ffmpegLoadPromise = (async () => {
         if (!window.FFmpegWASM || !window.FFmpegUtil) {
-          throw new Error('FFmpeg libraries failed to load. Check your connection and refresh.');
+          throw new Error('Video converter failed to load. Check your connection and refresh.');
         }
         const { FFmpeg } = FFmpegWASM;
         const { toBlobURL } = FFmpegUtil;
         const ffmpeg = new FFmpeg();
         const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
-        await ffmpeg.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-        });
+        await withTimeout(
+          ffmpeg.load({
+            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+          }),
+          FFMPEG_LOAD_TIMEOUT_MS,
+          'Video converter took too long to load. Your connection may be too slow for on-device conversion.'
+        );
         ffmpegInstance = ffmpeg;
         return ffmpeg;
       })();
@@ -1168,11 +1528,11 @@
 
     function setConversionProgress(pct) {
       if (pct >= 100) {
-        downloadBtn.innerText = 'Downloading...';
+        downloadBtn.innerText = 'Finishing...';
       } else if (pct > 0) {
         downloadBtn.innerText = `${pct}%`;
       } else {
-        downloadBtn.innerText = 'Saving...';
+        downloadBtn.innerText = 'Converting...';
       }
     }
 
@@ -1200,13 +1560,18 @@
 
       setConversionProgress(0);
       await ffmpeg.writeFile(inputName, new Uint8Array(await blob.arrayBuffer()));
-      await ffmpeg.exec([
-        '-i', inputName,
-        '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-        '-c:a', 'aac', '-b:a', '128k',
-        '-movflags', '+faststart',
-        outputName
-      ]);
+
+      await withTimeout(
+        ffmpeg.exec([
+          '-i', inputName,
+          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '25',
+          '-c:a', 'aac', '-b:a', '128k',
+          '-movflags', '+faststart',
+          outputName
+        ]),
+        FFMPEG_CONVERT_TIMEOUT_MS,
+        'Conversion took too long on this device.'
+      );
 
       setConversionProgress(100);
       const data = await ffmpeg.readFile(outputName);
@@ -1218,7 +1583,35 @@
       return new Blob([data], { type: 'video/mp4' });
     }
 
-    async function saveBlobToDisk(blob, filename) {
+    function isMp4Blob(blob) {
+      return !!(blob && blob.type && blob.type.includes('mp4'));
+    }
+
+    // Returns a blob that is guaranteed to be MP4. Recordings that are already MP4
+    // (common on iOS Safari, which can record MediaRecorder output directly as MP4)
+    // skip the heavy ffmpeg.wasm transcode entirely - that's the main source of
+    // "stalling" on phones, since loading a ~25MB wasm core plus running a real-time
+    // encode is slow and memory-hungry on mobile.
+    async function getExportableMp4Blob(sourceBlob) {
+      if (isMp4Blob(sourceBlob)) return sourceBlob;
+      return await convertRecordingToMP4(sourceBlob);
+    }
+
+    // Tries, in order: native share sheet (best on mobile - lets the user save
+    // straight to Photos), the File System Access API (desktop Chrome/Edge), then a
+    // plain anchor-download fallback for everything else.
+    async function shareOrSaveBlob(blob, filename) {
+      try {
+        const file = new File([blob], filename, { type: blob.type || 'video/mp4' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: filename });
+          return 'shared';
+        }
+      } catch (err) {
+        if (err && err.name === 'AbortError') return 'cancelled';
+        console.warn('Share failed, falling back to direct save:', err);
+      }
+
       if (window.showSaveFilePicker) {
         try {
           const handle = await window.showSaveFilePicker({
@@ -1228,9 +1621,10 @@
           const writable = await handle.createWritable();
           await writable.write(blob);
           await writable.close();
-          return;
+          return 'saved';
         } catch (err) {
-          if (err.name === 'AbortError') throw err;
+          if (err && err.name === 'AbortError') return 'cancelled';
+          console.warn('showSaveFilePicker failed, falling back to anchor download:', err);
         }
       }
 
@@ -1245,36 +1639,92 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(downloadUrl);
       }, 60000);
+      return 'downloaded';
+    }
+
+    function resetDownloadButtonIdle() {
+      downloadBtn.innerText = 'Save';
+      downloadBtn.classList.remove('save-pending', 'save-error');
     }
 
     downloadBtn.addEventListener('click', async () => {
-      if (!currentVideoBlob || isConverting) return;
+      if (isConverting) return;
 
+      // Phase 2: a save is already staged - this tap is a *fresh* user gesture,
+      // which mobile browsers require in order to actually trigger a share/download.
+      if (pendingSaveBlob) {
+        const blob = pendingSaveBlob;
+        const filename = pendingSaveFilename;
+        downloadBtn.disabled = true;
+        try {
+          const result = await shareOrSaveBlob(blob, filename);
+          if (result === 'cancelled') {
+            downloadBtn.innerText = 'Tap to Save';
+          } else {
+            pendingSaveBlob = null;
+            pendingSaveFilename = null;
+            downloadBtn.classList.remove('save-pending', 'save-error');
+            downloadBtn.innerText = 'Saved!';
+            setTimeout(resetDownloadButtonIdle, 2000);
+          }
+        } catch (err) {
+          console.error('Save failed:', err);
+          downloadBtn.classList.add('save-error');
+          downloadBtn.innerText = 'Tap to Retry';
+        } finally {
+          downloadBtn.disabled = false;
+        }
+        return;
+      }
+
+      // Phase 1: prepare an MP4 blob (instant if already MP4, otherwise a real convert).
+      if (!currentVideoBlob) return;
       isConverting = true;
       downloadBtn.disabled = true;
+      downloadBtn.classList.remove('save-error');
       setConversionProgress(0);
 
+      const alreadyMp4 = isMp4Blob(currentVideoBlob);
+
       try {
-        const mp4Blob = await convertRecordingToMP4(currentVideoBlob);
+        const mp4Blob = await getExportableMp4Blob(currentVideoBlob);
+        const filename = generateSaveFilename('mp4');
 
-        const defaultName = generateSaveFilename();
-        const customName = prompt('Save as:', defaultName);
-        if (!customName) {
-          downloadBtn.innerText = 'Save';
-          return;
+        if (alreadyMp4) {
+          // No async conversion happened, so we're still effectively inside the
+          // original tap - safe to save/share immediately.
+          const result = await shareOrSaveBlob(mp4Blob, filename);
+          if (result === 'cancelled') {
+            pendingSaveBlob = mp4Blob;
+            pendingSaveFilename = filename;
+            downloadBtn.classList.add('save-pending');
+            downloadBtn.innerText = 'Tap to Save';
+          } else {
+            downloadBtn.innerText = 'Saved!';
+            setTimeout(resetDownloadButtonIdle, 2000);
+          }
+        } else {
+          // Real conversion took real time - the original gesture has expired on
+          // most mobile browsers, so surface a fresh button instead of silently failing.
+          pendingSaveBlob = mp4Blob;
+          pendingSaveFilename = filename;
+          downloadBtn.classList.add('save-pending');
+          downloadBtn.innerText = 'Tap to Save';
         }
-        const filename = customName.endsWith('.mp4') ? customName : `${customName}.mp4`;
-
-        await saveBlobToDisk(mp4Blob, filename);
-        downloadBtn.innerText = 'Save';
       } catch (err) {
-        if (err.name === 'AbortError') {
-          downloadBtn.innerText = 'Save';
-          return;
+        console.error('Conversion failed:', err);
+        const fallbackToOriginal = confirm(
+          `MP4 conversion failed on this device (${err.message || err}).\n\nSave the original recording instead? It may not play everywhere but will still open on this device.`
+        );
+        if (fallbackToOriginal) {
+          const ext = currentVideoBlob.type.includes('webm') ? 'webm' : 'mp4';
+          pendingSaveBlob = currentVideoBlob;
+          pendingSaveFilename = generateSaveFilename(ext);
+          downloadBtn.classList.add('save-pending');
+          downloadBtn.innerText = 'Tap to Save';
+        } else {
+          resetDownloadButtonIdle();
         }
-        console.error('Save failed:', err);
-        alert(`Conversion failed: ${err.message || err}\n\nTap Save to retry.`);
-        downloadBtn.innerText = 'Save';
       } finally {
         isConverting = false;
         downloadBtn.disabled = false;
@@ -1283,5 +1733,3 @@
   </script>
 </body>
 </html>
-
-
