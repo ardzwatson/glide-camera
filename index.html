@@ -1,1285 +1,738 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V29.7)</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
-  
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
-  
-  <style>
-    body, html { 
-      margin: 0; height: 100dvh; width: 100%; box-sizing: border-box; background: #111; color: white; 
-      font-family: 'Marcellus', -apple-system, BlinkMacSystemFont, serif; overflow: hidden; display: flex; flex-direction: column;
-      padding: env(safe-area-inset-top, 8px) 12px calc(env(safe-area-inset-bottom, 0px) + 8px) 12px;
-    }
-
-    /* --- PASSWORD GATE STYLES --- */
-    #passwordGate {
-      position: fixed;
-      inset: 0;
-      background: #111;
-      z-index: 9999;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 20px;
-      padding: 20px;
-    }
-    .gate-card {
-      background-image: url('https://lh3.googleusercontent.com/d/1B2Dk1T1vTjx0QaqoJIPZs9wvx09M60AG');
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      border: 1px solid #2c2c2e;
-      padding: 40px 30px;
-      border-radius: 16px;
-      text-align: center;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.7);
-      max-width: 360px;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    .gate-card h2 { margin: 0 0 10px 0; font-size: 24px; letter-spacing: 1px; color: #fff; }
-    .gate-card p { margin: 0 0 24px 0; font-size: 13px; color: #8e8e93; }
-    .gate-input {
-      width: 100%;
-      height: 44px;
-      background: #2c2c2e;
-      border: 1px solid #3a3a3c;
-      border-radius: 8px;
-      color: white;
-      text-align: center;
-      font-size: 16px;
-      outline: none;
-      box-sizing: border-box;
-      margin-bottom: 16px;
-      font-family: inherit;
-      transition: border-color 0.2s ease;
-    }
-    .gate-input:focus { border-color: #ff453a; }
-    
-    .gate-btn {
-      position: relative;
-      width: 100%;
-      height: 44px;
-      background-color: transparent;
-      border: none;
-      border-radius: 8px;
-      color: white;
-      font-size: 14px;
-      font-weight: bold;
-      cursor: pointer;
-      font-family: inherit;
-      transition: filter 0.2s, transform 0.1s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
-      overflow: hidden;
-      z-index: 1;
-    }
-    .gate-btn:active { transform: scale(0.98); filter: brightness(0.85); }
-
-    .gate-btn::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background-image: url('https://lh3.googleusercontent.com/d/121yd-uXZ_3mkD9kYfgTuX_RbmtE-_mEv');
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      opacity: 0.4;
-      z-index: -1;
-    }
-    .gate-error { color: #ff453a; font-size: 12px; margin-top: 10px; display: none; }
-
-    #signOutBtn {
-      position: fixed;
-      left: 0;
-      top: 58%;
-      transform: translateY(-50%);
-      z-index: 999;
-      background-color: rgba(0, 0, 0, 0.15);
-      color: #ff453a;
-      border: 1px solid rgba(255, 69, 58, 0.2);
-      border-left: none;
-      border-radius: 0 8px 8px 0;
-      padding: 14px 10px;
-      font-family: 'Marcellus', serif;
-      font-weight: bold;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      cursor: pointer;
-      writing-mode: vertical-lr;
-      transform-origin: left center;
-      transition: background-color 0.2s ease, padding-left 0.2s ease;
-      display: none;
-    }
-    #signOutBtn:hover {
-      background-color: rgba(0, 0, 0, 0.35);
-      padding-left: 14px;
-    }
-
-    #appContent {
-      display: none;
-      flex-direction: column;
-      width: 100%;
-      height: 100%;
-    }
-
-    /* --- CONTAINER & WINDOW CONFIGURATION --- */
-    .container { display: flex; flex-direction: column; gap: 12px; width: 100%; flex-grow: 1; min-height: 0; }
-    @media (orientation: landscape) {
-      body, html { padding: env(safe-area-inset-top, 4px) 8px calc(env(safe-area-inset-bottom, 0px) + 4px) 8px; }
-      .container { flex-direction: row; gap: 8px; }
-      .box { height: 100% !important; width: 50% !important; }
-      .label, .rec-indicator { top: 6px !important; left: 6px !important; font-size: 9px !important; padding: 2px 6px !important; }
-      .rec-indicator { right: 6px !important; left: auto !important; }
-      .zoom-container { bottom: 6px !important; padding: 4px 8px !important; }
-      .timeline-footer { height: 28px !important; margin-top: 4px !important; gap: 8px !important; }
-      .controls-footer { height: 42px !important; margin-top: 4px !important; gap: 6px !important; }
-      button.custom-png-btn, .custom-select-ui { width: 95px !important; height: 34px !important; font-size: 10px !important; }
-      .mute-btn-container button { width: 80px !important; height: 26px !important; }
-    }
-    .box { position: relative; width: 100%; flex: 1 1 0%; height: 0; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
-    .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; background: #000; }
-    
-    video { 
-      width: 100%; 
-      height: 100%; 
-      object-fit: cover; 
-      background: #000; 
-      transition: transform 0.1s ease-out; 
-      transform-origin: center center; 
-      -webkit-touch-callout: none;
-      user-select: none;
-      z-index: 2;
-    }
-
-    /* Multi-track visibility styling to stop tracking canvas dropout */
-    .video-track {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      display: none;
-    }
-    .video-track.active-view {
-      display: block !important;
-    }
-    
-    .viewfinder-overlay {
-      position: absolute;
-      inset: 0;
-      background-image: url('https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg');
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      opacity: 0.35;
-      pointer-events: none;
-      z-index: 5;
-      display: block;
-      transition: opacity 0.2s ease;
-    }
-    .viewfinder-overlay.hidden { display: none !important; }
-
-    #refVideoContainer {
-      width: 100%;
-      height: 100%;
-      position: relative;
-      background: #000;
-      overflow: hidden;
-    }
-    
-    .label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 2px; }
-    #refLabel { background: rgba(46, 125, 50, 0.7); } 
-    #streamLabel { background: rgba(139, 0, 0, 0.7); } 
-    #streamLabel.review-active { background: rgba(0, 0, 0, 0.7) !important; } 
-    
-    .zoom-note { font-size: 8px; color: #aaa; font-weight: normal; }
-    .zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); opacity: 1; transition: opacity 0.3s ease; }
-    .zoom-container.fade-out { opacity: 0; pointer-events: none; }
-    .zoom-container label { font-size: 10px; font-weight: bold; font-family: 'Marcellus', serif; min-width: 24px; text-align: center; color: #007aff; }
-    .zoom-slider { -webkit-appearance: none; appearance: none; width: 100px; height: 4px; background: #444; border-radius: 2px; outline: none; }
-    .zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #007aff; cursor: pointer; }
-    
-    .timeline-footer { width: 100%; height: 36px; display: none; align-items: center; gap: 12px; background: rgba(0,0,0,0.4); padding: 0 12px; box-sizing: border-box; border-radius: 8px; margin-top: 8px; flex-shrink: 0; }
-    .timeline-footer.show { display: flex; }
-    .timeline-slider { flex-grow: 1; -webkit-appearance: none; appearance: none; height: 6px; background: #333; border-radius: 3px; outline: none; }
-    .timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #007aff; cursor: pointer; border: 2px solid white; }
-    .time-display { font-family: 'Marcellus', serif; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
-    
-    .ref-timeline-footer { width: 100%; height: 36px; display: none; align-items: center; gap: 12px; background: rgba(0,0,0,0.4); padding: 0 12px; box-sizing: border-box; border-radius: 8px; margin-bottom: 8px; flex-shrink: 0; }
-    .ref-timeline-footer.show { display: flex; }
-    .ref-timeline-slider { flex-grow: 1; -webkit-appearance: none; appearance: none; height: 6px; background: #333; border-radius: 3px; outline: none; }
-    .ref-timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #28a745; cursor: pointer; border: 2px solid white; }
-    .ref-time-display { font-family: 'Marcellus', serif; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
-    
-    .mute-btn-container { display: flex; align-items: center; justify-content: center; }
-    .mute-btn { font-family: 'Marcellus', serif; border: none; width: 90px; height: 32px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); background-color: #444; border-radius: 6px; }
-    .mute-btn.is-muted { background-color: #ff453a; }
-    
-    .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
-    
-    button.custom-png-btn, .custom-select-ui {
-      opacity: 0.85;
-      transition: opacity 0.2s ease, transform 0.1s ease, filter 0.2s;
-    }
-    button.custom-png-btn:hover, .custom-select-ui:hover { opacity: 1.0; }
-    
-    button.custom-png-btn { font-family: 'Marcellus', serif; background-color: transparent; border: none; width: 115px; height: 44px; cursor: pointer; font-size: 11px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; text-align: center; }
-    button.custom-png-btn:active { transform: scale(0.96); filter: brightness(0.85); }
-    button.custom-png-btn:disabled { filter: grayscale(1) opacity(0.4); cursor: not-allowed; transform: none; }
-    button.custom-png-btn.hidden { display: none !important; }
-    
-    #actionBtn { background-color: #007aff; border-radius: 8px; }
-    #actionBtn.btn-recording { background-color: #ff453a !important; }
-    
-    #previewRefBtn { background-color: #5856d6; border-radius: 8px; }
-    #previewRefBtn.previewing { background-color: #ff9500 !important; }
-    
-    #resetBtn { background-color: #8e8e93; border-radius: 8px; display: none; }
-    #resetBtn.danger-active { background-color: #ff3b30; }
-    
-    #overlayToggleBtn { background-color: #e5e5ea; color: #1c1c1e; border-radius: 8px; text-shadow: none; }
-    #overlayToggleBtn.overlay-off { background-color: #444 !important; color: white !important; opacity: 0.7; }
-    
-    .custom-select-ui {
-      font-family: 'Marcellus', serif;
-      width: 115px;
-      height: 44px;
-      background-color: #3a3a3c;
-      color: white;
-      border: 1px solid #48484a;
-      border-radius: 8px;
-      padding: 0 8px;
-      font-size: 11px;
-      font-weight: bold;
-      outline: none;
-      cursor: pointer;
-      display: block;
-    }
-    .custom-select-ui.hidden { display: none !important; }
-    .custom-select-ui:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    #downloadBtn { background-color: #34c759; border-radius: 8px; display: none; }
-    .version-tag { color: #556; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: 'Marcellus', serif; position: absolute; right: 4px; }
-    .countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: #fff; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
-    .countdown-overlay.show { opacity: 1; }
-    .rec-indicator { position: absolute; top: 12px; right: 12px; background: #ff3b30; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; animation: pulse 1s infinite alternate; display: none; z-index: 10; }
-    @keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
-
-    #videoWatermark {
-      position: absolute;
-      pointer-events: none;
-      color: rgba(255, 255, 255, 0.14);
-      font-size: 32px;
-      font-weight: bold;
-      font-family: 'Marcellus', serif;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      z-index: 15;
-      white-space: nowrap;
-      text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
-      display: none;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Sync Performance Review (V29.8)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+<style>
+body, html {
+margin: 0; height: 100dvh; width: 100%; box-sizing: border-box; background: #111; color: white;
+font-family: 'Marcellus', -apple-system, BlinkMacSystemFont, serif; overflow: hidden; display: flex; flex-direction: column;
+padding: env(safe-area-inset-top, 8px) 12px calc(env(safe-area-inset-bottom, 0px) + 8px) 12px;
+}
+/* --- PASSWORD GATE STYLES --- */
+#passwordGate {
+position: fixed;
+inset: 0;
+background: #111;
+z-index: 9999;
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+gap: 20px;
+padding: 20px;
+}
+.gate-card {
+background-image: url('https://lh3.googleusercontent.com/d/1B2Dk1T1vTjx0QaqoJIPZs9wvx09M60AG');
+background-size: cover;
+background-position: center;
+background-repeat: no-repeat;
+border: 1px solid #2c2c2e;
+padding: 40px 30px;
+border-radius: 16px;
+text-align: center;
+box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+max-width: 360px;
+width: 100%;
+box-sizing: border-box;
+}
+.gate-card h2 { margin: 0 0 10px 0; font-size: 24px; letter-spacing: 1px; color: #fff; }
+.gate-card p { margin: 0 0 24px 0; font-size: 13px; color: #8e8e93; }
+.gate-input {
+width: 100%;
+height: 44px;
+background: #2c2c2e;
+border: 1px solid #3a3a3c;
+border-radius: 8px;
+color: white;
+text-align: center;
+font-size: 16px;
+outline: none;
+box-sizing: border-box;
+margin-bottom: 16px;
+font-family: inherit;
+transition: border-color 0.2s ease;
+}
+.gate-input:focus { border-color: #ff453a; }
+.gate-btn {
+position: relative;
+width: 100%;
+height: 44px;
+background-color: transparent;
+border: none;
+border-radius: 8px;
+color: white;
+font-size: 14px;
+font-weight: bold;
+cursor: pointer;
+font-family: inherit;
+transition: filter 0.2s, transform 0.1s;
+display: flex;
+align-items: center;
+justify-content: center;
+text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+overflow: hidden;
+z-index: 1;
+}
+.gate-btn:active { transform: scale(0.98); filter: brightness(0.85); }
+.gate-btn::before {
+content: "";
+position: absolute;
+inset: 0;
+background-image: url('https://lh3.googleusercontent.com/d/121yd-uXZ_3mkD9kYfgTuX_RbmtE-_mEv');
+background-size: cover;
+background-position: center;
+background-repeat: no-repeat;
+opacity: 0.4;
+z-index: -1;
+}
+.gate-error { color: #ff453a; font-size: 12px; margin-top: 10px; display: none; }
+#signOutBtn {
+position: fixed;
+left: 0;
+top: 58%;
+transform: translateY(-50%);
+z-index: 999;
+background-color: rgba(0, 0, 0, 0.15);
+color: #ff453a;
+border: 1px solid rgba(255, 69, 58, 0.2);
+border-left: none;
+border-radius: 0 8px 8px 0;
+padding: 14px 10px;
+font-family: 'Marcellus', serif;
+font-weight: bold;
+font-size: 11px;
+text-transform: uppercase;
+letter-spacing: 1px;
+cursor: pointer;
+writing-mode: vertical-lr;
+transform-origin: left center;
+transition: background-color 0.2s ease, padding-left 0.2s ease;
+display: none;
+}
+#signOutBtn:hover {
+background-color: rgba(0, 0, 0, 0.35);
+padding-left: 14px;
+}
+#appContent {
+display: none;
+flex-direction: column;
+width: 100%;
+height: 100%;
+}
+/* --- CONTAINER & WINDOW CONFIGURATION --- */
+.container { display: flex; flex-direction: column; gap: 12px; width: 100%; flex-grow: 1; min-height: 0; }
+@media (orientation: landscape) {
+body, html { padding: env(safe-area-inset-top, 4px) 8px calc(env(safe-area-inset-bottom, 0px) + 4px) 8px; }
+.container { flex-direction: row; gap: 8px; }
+.box { height: 100% !important; width: 50% !important; }
+.label, .rec-indicator { top: 6px !important; left: 6px !important; font-size: 9px !important; padding: 2px 6px !important; }
+.rec-indicator { right: 6px !important; left: auto !important; }
+.zoom-container { bottom: 6px !important; padding: 4px 8px !important; }
+.timeline-footer { height: 28px !important; margin-top: 4px !important; gap: 8px !important; }
+.controls-footer { height: 42px !important; margin-top: 4px !important; gap: 6px !important; }
+button.custom-png-btn, .custom-select-ui { width: 95px !important; height: 34px !important; font-size: 10px !important; }
+.mute-btn-container button { width: 80px !important; height: 26px !important; }
+}
+.box { position: relative; width: 100%; flex: 1 1 0%; height: 0; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
+.viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; background: #000; }
+video {
+width: 100%;
+height: 100%;
+object-fit: cover;
+background: #000;
+transition: transform 0.1s ease-out;
+transform-origin: center center;
+-webkit-touch-callout: none;
+user-select: none;
+z-index: 2;
+}
+/* Multi-track visibility styling to stop tracking canvas dropout */
+.video-track {
+position: absolute;
+top: 0; left: 0; width: 100%; height: 100%;
+display: none;
+}
+.video-track.active-view {
+display: block !important;
+}
+.viewfinder-overlay {
+position: absolute;
+inset: 0;
+background-image: url('https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg');
+background-size: cover;
+background-position: center;
+background-repeat: no-repeat;
+opacity: 0.35;
+pointer-events: none;
+z-index: 5;
+display: block;
+transition: opacity 0.2s ease;
+}
+.viewfinder-overlay.hidden { display: none !important; }
+#refVideoContainer {
+width: 100%;
+height: 100%;
+position: relative;
+background: #000;
+overflow: hidden;
+}
+.label { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 2px; }
+#refLabel { background: rgba(46, 125, 50, 0.7); }
+#streamLabel { background: rgba(139, 0, 0, 0.7); }
+#streamLabel.review-active { background: rgba(0, 0, 0, 0.7) !important; }
+.zoom-note { font-size: 8px; color: #aaa; font-weight: normal; }
+.zoom-container { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.4); opacity: 1; transition: opacity 0.3s ease; }
+.zoom-container.fade-out { opacity: 0; pointer-events: none; }
+.zoom-container label { font-size: 10px; font-weight: bold; font-family: 'Marcellus', serif; min-width: 24px; text-align: center; color: #007aff; }
+.zoom-slider { -webkit-appearance: none; appearance: none; width: 100px; height: 4px; background: #444; border-radius: 2px; outline: none; }
+.zoom-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #007aff; cursor: pointer; }
+.timeline-footer { width: 100%; height: 36px; display: none; align-items: center; gap: 12px; background: rgba(0,0,0,0.4); padding: 0 12px; box-sizing: border-box; border-radius: 8px; margin-top: 8px; flex-shrink: 0; }
+.timeline-footer.show { display: flex; }
+.timeline-slider { flex-grow: 1; -webkit-appearance: none; appearance: none; height: 6px; background: #333; border-radius: 3px; outline: none; }
+.timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #007aff; cursor: pointer; border: 2px solid white; }
+.time-display { font-family: 'Marcellus', serif; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
+.ref-timeline-footer { width: 100%; height: 36px; display: none; align-items: center; gap: 12px; background: rgba(0,0,0,0.4); padding: 0 12px; box-sizing: border-box; border-radius: 8px; margin-bottom: 8px; flex-shrink: 0; }
+.ref-timeline-footer.show { display: flex; }
+.ref-timeline-slider { flex-grow: 1; -webkit-appearance: none; appearance: none; height: 6px; background: #333; border-radius: 3px; outline: none; }
+.ref-timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #28a745; cursor: pointer; border: 2px solid white; }
+.ref-time-display { font-family: 'Marcellus', serif; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
+.mute-btn-container { display: flex; align-items: center; justify-content: center; }
+.mute-btn { font-family: 'Marcellus', serif; border: none; width: 90px; height: 32px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); background-color: #444; border-radius: 6px; }
+.mute-btn.is-muted { background-color: #ff453a; }
+.controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
+button.custom-png-btn, .custom-select-ui {
+opacity: 0.85; transition: opacity 0.2s ease, transform 0.1s ease, filter 0.2s;
+}
+button.custom-png-btn:hover, .custom-select-ui:hover { opacity: 1.0; }
+button.custom-png-btn { font-family: 'Marcellus', serif; background-color: transparent; border: none; width: 115px; height: 44px; cursor: pointer; font-size: 11px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; text-align: center; }
+button.custom-png-btn:active { transform: scale(0.96); filter: brightness(0.85); }
+button.custom-png-btn:disabled { filter: grayscale(1) opacity(0.4); cursor: not-allowed; transform: none; }
+button.custom-png-btn.hidden { display: none !important; }
+#actionBtn { background-color: #007aff; border-radius: 8px; }
+#actionBtn.btn-recording { background-color: #ff453a !important; }
+#previewRefBtn { background-color: #5856d6; border-radius: 8px; }
+#previewRefBtn.previewing { background-color: #ff9500 !important; }
+#resetBtn { background-color: #8e8e93; border-radius: 8px; display: none; }
+#resetBtn.danger-active { background-color: #ff3b30; }
+#overlayToggleBtn { background-color: #e5e5ea; color: #1c1c1e; border-radius: 8px; text-shadow: none; }
+#overlayToggleBtn.overlay-off { background-color: #444 !important; color: white !important; opacity: 0.7; }
+.custom-select-ui {
+font-family: 'Marcellus', serif; width: 115px; height: 44px; background-color: #3a3a3c; color: white; border: 1px solid #48484a; border-radius: 8px; padding: 0 8px; font-size: 11px; font-weight: bold; outline: none; cursor: pointer; display: block;
+}
+.custom-select-ui.hidden { display: none !important; }
+.custom-select-ui:disabled { opacity: 0.4; cursor: not-allowed; }
+#downloadBtn { background-color: #34c759; border-radius: 8px; display: none; }
+.version-tag { color: #556; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: 'Marcellus', serif; position: absolute; right: 4px; }
+.countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: #fff; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+.countdown-overlay.show { opacity: 1; }
+.rec-indicator { position: absolute; top: 12px; right: 12px; background: #ff3b30; color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; animation: pulse 1s infinite alternate; display: none; z-index: 10; }
+@keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
+#videoWatermark {
+position: absolute; pointer-events: none; color: rgba(255, 255, 255, 0.14); font-size: 32px; font-weight: bold; font-family: 'Marcellus', serif; text-transform: uppercase; letter-spacing: 2px; z-index: 15; white-space: nowrap; text-shadow: 1px 1px 3px rgba(0,0,0,0.6); display: none; user-select: none; -webkit-user-select: none;
+}
+</style>
 </head>
 <body>
-
-  <!-- PASSWORD GATE OVERLAY -->
-  <div id="passwordGate">
-    <div class="gate-card">
-      <h2>SECURE PORTAL</h2>
-      <p>Please enter your access key to begin.</p>
-      <input type="password" id="gatePass" class="gate-input" placeholder="••••••••" autofocus>
-      <button onclick="unlockPortal()" class="gate-btn">Unlock</button>
-      <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
-    </div>
-  </div>
-
-  <button id="signOutBtn" onclick="handleSignOut()">Sign Out</button>
-
-  <!-- MAIN APP CONTAINER -->
-  <div id="appContent">
-    <div class="container">
-      <div class="box" id="videoBox">
-        <div class="label" id="refLabel">REFERENCE LESSON</div>
-        
-        <div id="refVideoContainer">
-          <video id="refVideo" 
-                 poster="https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg" 
-                 preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
-        </div>
-        
-        <div id="videoWatermark"></div>
-        <div class="countdown-overlay" id="countdown">3</div>
-      </div>
-      
-      <div class="box" id="cameraBox">
-        <div class="label" id="streamLabel"><span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span></div>
-        <div class="rec-indicator" id="recBadge">●  RECORDING</div>
-        <div class="viewfinder-container">
-          <!-- Separated elements isolate live camera initialization vs playback file streaming -->
-          <video id="viewfinder" class="video-track active-view" autoplay playsinline webkit-playsinline muted></video>
-          <video id="reviewPlayer" class="video-track" playsinline webkit-playsinline></video>
-          <div id="cameraOverlay" class="viewfinder-overlay"></div>
-        </div>
-        <div class="zoom-container" id="zoomUi"><input type="range" id="zoomSlider" class="zoom-slider" min="1" max="2" step="0.1" value="1"><label id="zoomLabel">1.0x</label></div>
-      </div>
-    </div>
-    
-    <div class="ref-timeline-footer" id="refTimeline">
-      <input type="range" id="refScrubSlider" class="ref-timeline-slider" min="0" max="100" step="0.1" value="0">
-      <div class="ref-time-display" id="refTimeLabel">0:00</div>
-    </div>
-    
-    <div class="timeline-footer" id="masterTimeline">
-      <input type="range" id="scrubSlider" class="timeline-slider" min="0" max="100" step="0.1" value="0">
-      <div class="time-display" id="timeLabel">0:00</div>
-      <div class="mute-btn-container"><button class="mute-btn is-muted" id="muteReviewBtn">Muted</button></div>
-    </div>
-    
-    <div class="controls-footer">
-      <button id="previewRefBtn" class="custom-png-btn">Preview Ref</button>
-      <button id="actionBtn" class="custom-png-btn">Start Session</button>
-      <button id="resetBtn" class="custom-png-btn" disabled>Reset / Clear</button>
-      <button id="overlayToggleBtn" class="custom-png-btn">Overlay On</button>
-      <select id="opacitySelector" class="custom-select-ui">
-        <option value="0.1">10%</option>
-        <option value="0.2">20%</option>
-        <option value="0.3" selected>30%</option>
-        <option value="0.4">40%</option>
-        <option value="0.5">50%</option>
-        <option value="0.6">60%</option>
-        <option value="0.7">70%</option>
-        <option value="0.8">80%</option>
-        <option value="0.9">90%</option>
-        <option value="1.0">100%</option>
-      </select>
-      <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V29.7</div>
-    </div>
-  </div>
-
-  <script>
-    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1fxQrloklFsVMvy1-hf5kouhH1w0N_gaPy26uA5jT7S8/gviz/tq?tqx=out:csv";
-    const BUNNY_HLS_URL = "https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/playlist.m3u8";
-    const THUMBNAIL_ASSET = "https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg";
-    
-    let userDatabase = {}; 
-    let authorizedUser = "";
-    let watermarkTimer = null;
-    let hlsInstance = null;
-
-    let webAudioContext = null;
-    let webAudioSourceNode = null;
-    let webAudioGainNode = null;
-
-    const refVideo = document.getElementById('refVideo');
-    const gateError = document.getElementById('gateError');
-    const watermarkEl = document.getElementById('videoWatermark');
-    const signOutBtn = document.getElementById('signOutBtn');
-
-    const viewfinder = document.getElementById('viewfinder');
-    const reviewPlayer = document.getElementById('reviewPlayer');
-    const cameraOverlay = document.getElementById('cameraOverlay');
-    const actionBtn = document.getElementById('actionBtn');
-    const previewRefBtn = document.getElementById('previewRefBtn');
-    const overlayToggleBtn = document.getElementById('overlayToggleBtn');
-    const opacitySelector = document.getElementById('opacitySelector');
-    const resetBtn = document.getElementById('resetBtn');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const muteReviewBtn = document.getElementById('muteReviewBtn');
-    const countdown = document.getElementById('countdown');
-    const recBadge = document.getElementById('recBadge');
-    const streamLabel = document.getElementById('streamLabel');
-    const refLabel = document.getElementById('refLabel');
-    const cameraBox = document.getElementById('cameraBox');
-    const zoomSlider = document.getElementById('zoomSlider');
-    const zoomLabel = document.getElementById('zoomLabel');
-    const zoomUi = document.getElementById('zoomUi');
-    const masterTimeline = document.getElementById('masterTimeline');
-    const scrubSlider = document.getElementById('scrubSlider');
-    const timeLabel = document.getElementById('timeLabel');
-    const refTimeline = document.getElementById('refTimeline');
-    const refScrubSlider = document.getElementById('refScrubSlider');
-    const refTimeLabel = document.getElementById('refTimeLabel');
-
-    let mediaRecorder = null, recordedChunks = [], liveStream = null, isRecordingMode = false, isReviewMode = false, isReviewPlaying = false, isPreviewingRef = false, zoomFadeTimeout = null, isUserScrubbing = false, chosenScale = 1, currentVideoBlob = null, isSeeking = false;
-    let reviewPlaybackUrl = null, ffmpegInstance = null, ffmpegLoadPromise = null, isConverting = false, ffmpegProgressHandler = null;
-    let overlayActive = true; 
-    const PRE_RECORD_ALIGN_TIME = 20;
-
-    refVideo.addEventListener('loadstart', () => {
-      refVideo.setAttribute('poster', THUMBNAIL_ASSET);
-    });
-
-    async function fetchAccessDatabase() {
-      try {
-        const response = await fetch(GOOGLE_SHEET_CSV_URL);
-        if (!response.ok) throw new Error("Database sync failed");
-        const csvText = await response.text();
-        const lines = csvText.split(/\r?\n/);
-        lines.forEach(line => {
-          const columns = line.split(',').map(col => col.replace(/^"|"$/g, '').trim());
-          if (columns[0] && columns[1]) userDatabase[columns[0].toLowerCase()] = columns[1];
-        });
-        if (gateError) { gateError.style.display = 'none'; gateError.innerText = "Incorrect passcode. Please try again."; }
-      } catch (err) {
-        if (gateError) { gateError.style.display = 'block'; gateError.innerText = "Security database offline."; }
-      }
-    }
-    fetchAccessDatabase();
-
-    function unlockPortal() {
-      const passInput = document.getElementById('gatePass');
-      const input = passInput ? passInput.value.trim().toLowerCase() : "";
-      if (userDatabase[input]) {
-        authorizedUser = userDatabase[input];
-        document.getElementById('passwordGate').style.display = 'none';
-        document.getElementById('appContent').style.display = 'flex';
-        signOutBtn.style.display = 'block';
-        
-        if (Hls.isSupported()) {
-          hlsInstance = new Hls({
-            enableWorker: true,
-            lowLatencyMode: true,
-            maxBufferLength: 30,
-            maxMaxBufferLength: 600, // FIXED: Buffer retention increased
-            backBufferLength: 90,    // FIXED: Keeps back buffer in memory for looping
-            appendErrorMaxRetry: 5
-          });
-          hlsInstance.loadSource(BUNNY_HLS_URL);
-          hlsInstance.attachMedia(refVideo);
-        } else if (refVideo.canPlayType('application/vnd.apple.mpegurl')) {
-          refVideo.src = BUNNY_HLS_URL;
-        }
-        startWatermarkEngine();
-        initCamera();
-      } else {
-        if (gateError) gateError.style.display = 'block';
-        if (passInput) passInput.value = '';
-      }
-    }
-
-    function handleSignOut() {
-      cleanupIsolatedAudioPipeline();
-      clearTimeout(zoomFadeTimeout);
-      if (watermarkTimer) clearInterval(watermarkTimer);
-      if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
-      if (liveStream) liveStream.getTracks().forEach(track => track.stop());
-      if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-      
-      isRecordingMode = false; isReviewMode = false; isReviewPlaying = false; isPreviewingRef = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1; isSeeking = false; isConverting = false;
-      if (reviewPlaybackUrl) { URL.revokeObjectURL(reviewPlaybackUrl); reviewPlaybackUrl = null; }
-      refVideo.pause(); refVideo.removeAttribute('src'); refVideo.setAttribute('poster', THUMBNAIL_ASSET); refVideo.load();
-      
-      viewfinder.pause(); 
-      viewfinder.srcObject = null;
-      reviewPlayer.pause();
-      removeVideoEndedListener();
-      reviewPlayer.removeAttribute('src');
-      reviewPlayer.load();
-
-      // Reset views visibility safely
-      reviewPlayer.classList.remove('active-view');
-      viewfinder.classList.add('active-view');
-
-      watermarkEl.style.display = 'none'; signOutBtn.style.display = 'none';
-      document.getElementById('appContent').style.display = 'none';
-      
-      reviewPlayer.muted = true; muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
-      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show'); downloadBtn.style.display = "none";
-      downloadBtn.disabled = false; downloadBtn.innerText = "Save";
-      zoomSlider.value = 1; zoomLabel.innerText = "1.0x"; viewfinder.style.transform = "scale(1)";
-      zoomUi.style.display = "flex"; recBadge.style.display = "none"; streamLabel.classList.remove('review-active');
-      streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
-      
-      previewRefBtn.classList.remove('hidden'); previewRefBtn.innerText = "Preview Ref"; previewRefBtn.className = "custom-png-btn";
-      overlayToggleBtn.classList.remove('hidden'); opacitySelector.classList.remove('hidden');
-      overlayToggleBtn.disabled = false; opacitySelector.disabled = false; overlayActive = true;
-      cameraOverlay.classList.remove('hidden'); 
-      actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
-      resetBtn.innerText = "Reset / Clear"; resetBtn.disabled = true; resetBtn.style.display = "none"; resetBtn.classList.remove('danger-active');
-      const passInput = document.getElementById('gatePass'); if (passInput) passInput.value = '';
-      document.getElementById('passwordGate').style.display = 'flex';
-    }
-
-    document.getElementById('gatePass').addEventListener('keypress', function(e) { if (e.key === 'Enter') unlockPortal(); });
-
-    function startWatermarkEngine() {
-      watermarkEl.innerText = `${authorizedUser} • DRAFT PREVIEW`;
-      watermarkEl.style.display = 'block';
-      const moveWatermark = () => {
-        const container = refVideo.parentElement;
-        const maxX = container.clientWidth - watermarkEl.clientWidth - 24;
-        const maxY = container.clientHeight - watermarkEl.clientHeight - 24;
-        const randomX = Math.max(12, Math.floor(Math.random() * maxX));
-        const randomY = Math.max(12, Math.floor(Math.random() * maxY));
-        watermarkEl.style.left = `${randomX}px`; watermarkEl.style.top = `${randomY}px`;
-      };
-      moveWatermark(); watermarkTimer = setInterval(moveWatermark, 4500);
-    }
-
-    async function initCamera() {
-      try { 
-        if (liveStream) {
-          liveStream.getTracks().forEach(t => t.stop());
-        }
-        liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 360 } }, audio: true }); 
-        viewfinder.srcObject = liveStream; 
-        resetZoomFadeTimer(); setupInitialState(); 
-      } catch (err) { setupInitialState(); }
-    }
-    
-    function setupInitialState() {
-      if (!isReviewMode && !isRecordingMode) {
-        if (!isPreviewingRef) {
-          refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
-          refVideo.pause();
-          refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing alignment framework (${PRE_RECORD_ALIGN_TIME}s)</span>`;
-        }
-        if (overlayActive) { cameraOverlay.classList.remove('hidden'); }
-        overlayToggleBtn.classList.remove('hidden');
-        opacitySelector.classList.remove('hidden');
-        masterTimeline.classList.remove('show');
-        refTimeline.classList.remove('show');
-        previewRefBtn.classList.remove('hidden');
-      }
-    }
-    
-    function resetZoomFadeTimer() {
-      if (isReviewMode) return;
-      zoomUi.classList.remove('fade-out'); clearTimeout(zoomFadeTimeout);
-      zoomFadeTimeout = setTimeout(() => { if (!isReviewMode) zoomUi.classList.add('fade-out'); }, 3000);
-    }
-    cameraBox.addEventListener('mousemove', resetZoomFadeTimer);
-    cameraBox.addEventListener('touchstart', resetZoomFadeTimer);
-    
-    zoomSlider.addEventListener('input', (e) => { 
-      chosenScale = parseFloat(e.target.value); zoomLabel.innerText = `${chosenScale.toFixed(1)}x`; 
-      viewfinder.style.transform = `scale(${chosenScale})`; resetZoomFadeTimer(); 
-    });
-    opacitySelector.addEventListener('change', (e) => { cameraOverlay.style.opacity = e.target.value; });
-    
-    overlayToggleBtn.addEventListener('click', () => {
-      overlayActive = !overlayActive;
-      if (overlayActive) { 
-        cameraOverlay.classList.remove('hidden'); 
-        overlayToggleBtn.innerText = "Overlay On"; overlayToggleBtn.classList.remove('overlay-off'); 
-      } else { 
-        cameraOverlay.classList.add('hidden'); 
-        overlayToggleBtn.innerText = "Overlay Off"; overlayToggleBtn.classList.add('overlay-off'); 
-      }
-    });
-
-    previewRefBtn.addEventListener('click', () => {
-      if (isRecordingMode || isReviewMode) return;
-      
-      if (!isPreviewingRef) {
-        isPreviewingRef = true;
-        previewRefBtn.innerText = "Pause Preview";
-        previewRefBtn.classList.add('previewing');
-        refLabel.innerHTML = `<span>REFERENCE LESSON (PREVIEWING)</span>`;
-        refVideo.currentTime = 0;
-        
-        // Show reference timeline
-        if (refVideo.duration && isFinite(refVideo.duration) && refVideo.duration > 0) {
-          refScrubSlider.max = refVideo.duration;
-          refScrubSlider.value = 0;
-          updateRefTimeDisplay(0);
-          refTimeline.classList.add('show');
-        }
-        
-        refVideo.play().catch(() => {});
-      } else {
-        isPreviewingRef = false;
-        previewRefBtn.innerText = "Preview Ref";
-        previewRefBtn.classList.remove('previewing');
-        refVideo.pause();
-        refTimeline.classList.remove('show');
-        setupInitialState();
-      }
-    });
-
-    actionBtn.addEventListener('click', () => {
-      if (!isRecordingMode && !isReviewMode) {
-        if (isPreviewingRef) {
-          isPreviewingRef = false;
-          previewRefBtn.innerText = "Preview Ref";
-          previewRefBtn.classList.remove('previewing');
-          refVideo.pause();
-        }
-        startCountdown();
-      } else if (isRecordingMode) {
-        stopRecordingSession();
-      } else if (isReviewMode) {
-        if (!isReviewPlaying) { playBoth(); } else { pauseBoth(); }
-      }
-    });
-
-    function startCountdown() {
-      actionBtn.disabled = true;
-      resetBtn.disabled = true;
-      previewRefBtn.disabled = true;
-      let count = 3;
-      countdown.innerText = count;
-      countdown.classList.add('show');
-      
-      refVideo.currentTime = 0;
-      refVideo.pause();
-
-      const interval = setInterval(() => {
-        count--;
-        if (count > 0) {
-          countdown.innerText = count;
-        } else {
-          clearInterval(interval);
-          countdown.classList.remove('show');
-          startRecordingSession();
-        }
-      }, 1000);
-    }
-
-    function handleVideoTrackFinished() {
-      if (isRecordingMode) {
-        stopRecordingSession();
-      }
-    }
-
-    function startRecordingSession() {
-      isRecordingMode = true;
-      recordedChunks = [];
-      
-      recBadge.style.display = "block";
-      refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
-      
-      actionBtn.innerText = "Stop Session";
-      actionBtn.className = "custom-png-btn btn-recording";
-      actionBtn.disabled = false;
-      
-      resetBtn.style.display = "none";
-      resetBtn.disabled = true;
-      previewRefBtn.classList.add('hidden');
-
-      overlayToggleBtn.classList.remove('hidden');
-      opacitySelector.classList.remove('hidden');
-      if (overlayActive) {
-        cameraOverlay.classList.remove('hidden');
-      } else {
-        cameraOverlay.classList.add('hidden');
-      }
-      
-      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show');
-
-      refVideo.addEventListener('ended', handleVideoTrackFinished);
-
-      let mimeType = 'video/webm;codecs=vp9,opus';
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'video/webm;codecs=vp8,opus';
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : '';
-        }
-      }
-      const options = mimeType ? { mimeType } : {};
-
-      try {
-        mediaRecorder = new MediaRecorder(liveStream, options);
-        mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
-        mediaRecorder.onstop = () => {
-          currentVideoBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
-          setupReviewModePipeline();
-        };
-
-        refVideo.currentTime = 0;
-        refVideo.play().then(() => {
-          mediaRecorder.start();
-        }).catch(() => {
-          mediaRecorder.start();
-        });
-      } catch (err) {
-        isRecordingMode = false;
-        previewRefBtn.disabled = false;
-        setupInitialState();
-      }
-    }
-
-    function stopRecordingSession() {
-      if (!isRecordingMode) return;
-      isRecordingMode = false;
-      
-      refVideo.removeEventListener('ended', handleVideoTrackFinished);
-      refVideo.pause();
-      recBadge.style.display = "none";
-
-      if (mediaRecorder && mediaRecorder.state !== "inactive") {
-        mediaRecorder.stop();
-      }
-    }
-
-    function setupReviewModePipeline() {
-      isReviewMode = true;
-      isReviewPlaying = false;
-      isSeeking = false;
-
-      actionBtn.innerText = "Play Review";
-      actionBtn.className = "custom-png-btn";
-      actionBtn.disabled = false;
-
-      resetBtn.innerText = "Reset / Clear";
-      resetBtn.disabled = false;
-      resetBtn.style.display = "block";
-      resetBtn.classList.remove('danger-active');
-
-      downloadBtn.style.display = "block";
-      downloadBtn.disabled = false;
-      downloadBtn.innerText = "Save";
-      isConverting = false;
-      previewRefBtn.classList.add('hidden');
-
-      overlayToggleBtn.classList.add('hidden');
-      opacitySelector.classList.add('hidden');
-      cameraOverlay.classList.add('hidden');
-      zoomUi.style.display = "none";
-
-      streamLabel.classList.add('review-active');
-      streamLabel.innerHTML = `<span>YOU (REVIEW PLAYBACK)</span>`;
-      refLabel.innerHTML = `<span>REFERENCE LESSON (REVIEW PLAYBACK)</span>`;
-
-      refVideo.pause();
-      refVideo.currentTime = 0;
-
-      // Toggle views instantly without rebuilding hardware stream profiles
-      viewfinder.classList.remove('active-view');
-      reviewPlayer.classList.add('active-view');
-
-      if (reviewPlaybackUrl) URL.revokeObjectURL(reviewPlaybackUrl);
-      reviewPlaybackUrl = URL.createObjectURL(currentVideoBlob);
-      reviewPlayer.src = reviewPlaybackUrl;
-      reviewPlayer.load();
-       
-      // Apply zoom from preview to review player
-      if (chosenScale && chosenScale > 0) {
-        reviewPlayer.style.transform = `scale(${chosenScale})`;
-      }
-        
-      reviewPlayer.muted = true;
-
-      try {
-       const audioSetupSuccess = setupIsolatedAudioPipeline(reviewPlayer);
-       if (audioSetupSuccess && webAudioGainNode) {
-         webAudioGainNode.gain.setValueAtTime(0, webAudioContext.currentTime);
-         if (webAudioContext && webAudioContext.state !== 'suspended') {
-           webAudioContext.suspend();
-         }
-       }
-      } catch (e) {
-       console.error('Audio setup error:', e);
-      }
-
-      muteReviewBtn.innerText = "Muted";
-      muteReviewBtn.classList.add('is-muted');
-
-      reviewPlayer.onloadedmetadata = () => {
-        let recordedDuration = reviewPlayer.duration;
-        
-        if (recordedDuration === Infinity || recordedDuration === 0 || isNaN(recordedDuration)) {
-          recordedDuration = 0;
-        }
-        
-        scrubSlider.max = recordedDuration;
-        scrubSlider.value = 0;
-        updateTimeDisplayLabel(0);
-        masterTimeline.classList.add('show');
-        
-        reviewPlayer.pause();
-        refVideo.currentTime = 0;
-        refVideo.pause();
-      };
-
-      reviewPlayer.onprogress = () => {
-        const validDuration = reviewPlayer.duration && isFinite(reviewPlayer.duration) && reviewPlayer.duration > 0;
-        const sliderMaxSet = parseFloat(scrubSlider.max);
-        
-        if (validDuration && (sliderMaxSet === 0 || Math.abs(scrubSlider.max - reviewPlayer.duration) > 0.1)) {
-          scrubSlider.max = reviewPlayer.duration;
-        }
-      };
-
-      reviewPlayer.ontimeupdate = () => {
-        if (!isUserScrubbing && !isSeeking && isReviewPlaying) {
-          const validDuration = reviewPlayer.duration && isFinite(reviewPlayer.duration) && reviewPlayer.duration > 0;
-          if (validDuration) {
-            scrubSlider.value = reviewPlayer.currentTime;
-            updateTimeDisplayLabel(reviewPlayer.currentTime);
-          }
-        }
-      };
-
-      addVideoEndedListener();
-      initializePerformanceReviewClock();
-    }
-
-    function setupIsolatedAudioPipeline(targetVideoElement) {
-      cleanupIsolatedAudioPipeline();
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContextClass) {
-        console.warn('AudioContext not available, using video muted property fallback');
-        return false;
-      }
-       
-      try {
-        webAudioContext = new AudioContextClass();
-        webAudioSourceNode = webAudioContext.createMediaElementSource(targetVideoElement);
-        webAudioGainNode = webAudioContext.createGain();
-         
-        webAudioSourceNode.connect(webAudioGainNode);
-        webAudioGainNode.connect(webAudioContext.destination);
-         
-        // Resume context immediately for better responsiveness
-        if (webAudioContext.state === 'suspended') {
-          webAudioContext.resume().catch(e => console.warn('Audio context resume failed:', e));
-        }
-         
-        return true;
-      } catch (e) {
-        console.error('Audio pipeline setup failed:', e);
-        cleanupIsolatedAudioPipeline();
-        return false;
-      }
-    }
-
-    function cleanupIsolatedAudioPipeline() {
-      if (webAudioSourceNode) { webAudioSourceNode.disconnect(); webAudioSourceNode = null; }
-      if (webAudioGainNode) { webAudioGainNode.disconnect(); webAudioGainNode = null; }
-      if (webAudioContext) { if (webAudioContext.state !== 'closed') { webAudioContext.close(); } webAudioContext = null; }
-    }
-
-    muteReviewBtn.addEventListener('click', () => {
-      if (!isReviewMode) return;
-      
-      if (muteReviewBtn.classList.contains('is-muted')) {
-        // Unmute: use both methods
-        reviewPlayer.muted = false;
-        if (webAudioGainNode) {
-          webAudioGainNode.gain.setValueAtTime(1, webAudioContext.currentTime);
-          if (isReviewPlaying && webAudioContext.state === 'suspended') {
-            webAudioContext.resume();
-          }
-        }
-        muteReviewBtn.innerText = "Unmuted";
-        muteReviewBtn.classList.remove('is-muted');
-      } else {
-        // Mute: use both methods
-        reviewPlayer.muted = true;
-        if (webAudioGainNode) {
-          webAudioGainNode.gain.setValueAtTime(0, webAudioContext.currentTime);
-        }
-        muteReviewBtn.innerText = "Muted";
-        muteReviewBtn.classList.add('is-muted');
-      }
-    });
-
-    function playBoth() {
-      if (!isReviewMode) return;
-      isReviewPlaying = true;
-      actionBtn.innerText = "Pause Review";
-       
-      if (webAudioContext && webAudioContext.state === 'suspended' && !muteReviewBtn.classList.contains('is-muted')) {
-        webAudioContext.resume();
-      }
-
-      const targetTime = reviewPlayer.currentTime;
-      refVideo.currentTime = targetTime;
-
-      const playPromises = [
-        refVideo.play().catch(e => console.warn('RefVideo play error:', e)),
-        reviewPlayer.play().catch(e => {
-          console.warn('ReviewPlayer play error:', e);
-          // Retry after a brief delay for full recordings
-          setTimeout(() => {
-            reviewPlayer.play().catch(err => console.error('ReviewPlayer retry failed:', err));
-          }, 100);
-        })
-      ];
-       
-      Promise.all(playPromises).catch(err => console.warn('Play errors:', err));
-    }
-
-    function pauseBoth() {
-      isReviewPlaying = false;
-      actionBtn.innerText = "Play Review";
-      reviewPlayer.pause();
-      refVideo.pause();
-       
-      // Don't suspend audio context immediately - user might resume playing
-      // Let it suspend naturally after playback ends
-    }
-
-    function handleReviewLoopSequence() {
-      if (!isReviewMode) return;
-      
-      // FIXED: Soft seek stabilizes the HLS buffer
-      reviewPlayer.currentTime = 0.1;
-      refVideo.currentTime = 0.1;
-      scrubSlider.value = 0;
-      updateTimeDisplayLabel(0);
-      
-      if (isReviewPlaying) {
-        if (webAudioContext && webAudioContext.state === 'suspended' && !muteReviewBtn.classList.contains('is-muted')) {
-          webAudioContext.resume();
-        }
-        
-        refVideo.play().then(() => {
-          reviewPlayer.play().catch(() => {});
-        }).catch(() => {
-          reviewPlayer.play().catch(() => {});
-        });
-      }
-    }
-
-    function addVideoEndedListener() {
-      reviewPlayer.addEventListener('ended', handleReviewLoopSequence);
-    }
-
-    function removeVideoEndedListener() {
-      reviewPlayer.removeEventListener('ended', handleReviewLoopSequence);
-    }
-
-    function initializePerformanceReviewClock() {
-      let activeAnimationFrameId = null;
-
-      function step() {
-        if (!isReviewMode) {
-          if (activeAnimationFrameId) cancelAnimationFrame(activeAnimationFrameId);
-          return;
-        }
-
-        if (isReviewPlaying && !isUserScrubbing && !isSeeking) {
-          const currentCamTime = reviewPlayer.currentTime;
-          
-          // FIXED: Relaxed threshold prevents continuous micro-seeking and stuttering
-          if (Math.abs(refVideo.currentTime - currentCamTime) > 0.25) {
-            refVideo.currentTime = currentCamTime;
-          }
-
-          scrubSlider.value = currentCamTime;
-          updateTimeDisplayLabel(currentCamTime);
-        }
-        activeAnimationFrameId = requestAnimationFrame(step);
-      }
-      
-      activeAnimationFrameId = requestAnimationFrame(step);
-    }
-
-    function updateTimeDisplayLabel(seconds) {
-      if (isNaN(seconds) || !isFinite(seconds)) seconds = 0;
-      const mins = Math.floor(seconds / 60);
-      const secs = Math.floor(seconds % 60);
-      timeLabel.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-    }
-
-    function updateRefTimeDisplay(seconds) {
-      if (isNaN(seconds) || !isFinite(seconds)) seconds = 0;
-      const mins = Math.floor(seconds / 60);
-      const secs = Math.floor(seconds % 60);
-      refTimeLabel.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-    }
-
-    // Reference video timeline handlers
-    refScrubSlider.addEventListener('input', () => {
-      if (!isPreviewingRef) return;
-      const targetTime = parseFloat(refScrubSlider.value);
-      updateRefTimeDisplay(targetTime);
-      refVideo.currentTime = targetTime;
-    });
-
-    refVideo.addEventListener('timeupdate', () => {
-      if (isPreviewingRef && refVideo.duration && isFinite(refVideo.duration) && refVideo.duration > 0) {
-        if (!refScrubSlider.classList.contains('user-scrubbing')) {
-          refScrubSlider.value = refVideo.currentTime;
-          updateRefTimeDisplay(refVideo.currentTime);
-        }
-      }
-    });
-
-    refVideo.addEventListener('loadedmetadata', () => {
-      if (isPreviewingRef && refVideo.duration && isFinite(refVideo.duration) && refVideo.duration > 0) {
-        refScrubSlider.max = refVideo.duration;
-        refTimeline.classList.add('show');
-      }
-    });
-
-    // Fixed slider interactions using synchronized layout-stable changes
-    scrubSlider.addEventListener('input', () => {
-      if (!isReviewMode) return;
-      isUserScrubbing = true;
-      isSeeking = true;
-      const targetTime = parseFloat(scrubSlider.value);
-      updateTimeDisplayLabel(targetTime);
-      
-      reviewPlayer.currentTime = targetTime;
-      refVideo.currentTime = targetTime;
-    });
-
-    scrubSlider.addEventListener('change', () => {
-      if (!isReviewMode) return;
-      const targetTime = parseFloat(scrubSlider.value);
-      
-      let pendingSeeks = 2;
-      const checkSeekDone = () => {
-        pendingSeeks--;
-        if (pendingSeeks === 0) {
-          isSeeking = false;
-          isUserScrubbing = false;
-          if (isReviewPlaying) {
-            if (webAudioContext && webAudioContext.state === 'suspended' && !muteReviewBtn.classList.contains('is-muted')) {
-              webAudioContext.resume();
-            }
-            refVideo.play().then(() => reviewPlayer.play().catch(() => {})).catch(() => {});
-          }
-        }
-      };
-
-      reviewPlayer.fastSeek ? reviewPlayer.fastSeek(targetTime) : (reviewPlayer.currentTime = targetTime);
-      refVideo.fastSeek ? refVideo.fastSeek(targetTime) : (refVideo.currentTime = targetTime);
-
-      setTimeout(checkSeekDone, 40);
-      setTimeout(checkSeekDone, 40);
-    });
-
-    resetBtn.addEventListener('click', () => {
-      if (!isReviewMode) return;
-      
-      if (!resetBtn.classList.contains('danger-active')) {
-        resetBtn.classList.add('danger-active');
-        resetBtn.innerText = "Are you sure?";
-        setTimeout(() => {
-          if (isReviewMode && resetBtn.classList.contains('danger-active')) {
-            resetBtn.classList.remove('danger-active');
-            resetBtn.innerText = "Reset / Clear";
-          }
-        }, 4000);
-      } else {
-        performFullSystemReset();
-      }
-    });
-
-    function performFullSystemReset() {
-      pauseBoth();
-      cleanupIsolatedAudioPipeline();
-      removeVideoEndedListener();
-      
-      isReviewMode = false;
-      isReviewPlaying = false;
-      isSeeking = false;
-      isPreviewingRef = false;
-      recordedChunks = [];
-      currentVideoBlob = null;
-      if (reviewPlaybackUrl) { URL.revokeObjectURL(reviewPlaybackUrl); reviewPlaybackUrl = null; }
-
-      // Unload playback track safely
-      reviewPlayer.pause();
-      reviewPlayer.removeAttribute('src'); 
-      reviewPlayer.load();
-
-      // Instantly switch display back to live viewfinder
-      reviewPlayer.classList.remove('active-view');
-      viewfinder.classList.add('active-view');
-      reviewPlayer.style.transform = 'scale(1)';
-
-      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show');
-      downloadBtn.style.display = "none";
-      downloadBtn.disabled = false;
-      downloadBtn.innerText = "Save";
-      isConverting = false;
-      zoomUi.style.display = "flex";
-      resetBtn.style.display = "none";
-      resetBtn.disabled = true;
-      resetBtn.classList.remove('danger-active');
-      resetBtn.innerText = "Reset / Clear";
-      
-      previewRefBtn.disabled = false;
-      previewRefBtn.innerText = "Preview Ref";
-      previewRefBtn.className = "custom-png-btn";
-
-      streamLabel.classList.remove('review-active');
-      streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
-      
-      actionBtn.innerText = "Start Session";
-      actionBtn.className = "custom-png-btn";
-      
-      overlayToggleBtn.classList.remove('hidden');
-      opacitySelector.classList.remove('hidden');
-      if (overlayActive) cameraOverlay.classList.remove('hidden');
-
-      setupInitialState();
-    }
-
-    function generateSaveFilename() {
-      const displayName = (authorizedUser || 'User')
-        .trim()
-        .split(/\s+/)
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join('_')
-        .replace(/[^\w\-]/g, '');
-      const now = new Date();
-      const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      const time = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-      return `${displayName}_Performance_Review_${date}_${time}.mp4`;
-    }
-
-    async function loadFFmpeg() {
-      if (ffmpegInstance) return ffmpegInstance;
-      if (ffmpegLoadPromise) return ffmpegLoadPromise;
-
-      ffmpegLoadPromise = (async () => {
-        if (!window.FFmpegWASM || !window.FFmpegUtil) {
-          throw new Error('FFmpeg libraries failed to load. Check your connection and refresh.');
-        }
-        const { FFmpeg } = FFmpegWASM;
-        const { toBlobURL } = FFmpegUtil;
-        const ffmpeg = new FFmpeg();
-        const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
-        await ffmpeg.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-        });
-        ffmpegInstance = ffmpeg;
-        return ffmpeg;
-      })();
-
-      try {
-        return await ffmpegLoadPromise;
-      } catch (err) {
-        ffmpegLoadPromise = null;
-        throw err;
-      }
-    }
-
-    function setConversionProgress(pct) {
-      if (pct >= 100) {
-        downloadBtn.innerText = 'Downloading...';
-      } else if (pct > 0) {
-        downloadBtn.innerText = `${pct}%`;
-      } else {
-        downloadBtn.innerText = 'Saving...';
-      }
-    }
-
-    function detachFFmpegProgress(ffmpeg) {
-      if (ffmpegProgressHandler) {
-        ffmpeg.off('progress', ffmpegProgressHandler);
-        ffmpegProgressHandler = null;
-      }
-    }
-
-    async function convertRecordingToMP4(blob) {
-      if (!ffmpegInstance) downloadBtn.innerText = 'Loading...';
-      const ffmpeg = await loadFFmpeg();
-      const inputExt = blob.type.includes('webm') ? 'webm' : 'mp4';
-      const inputName = `recording_input.${inputExt}`;
-      const outputName = 'recording_output.mp4';
-
-      detachFFmpegProgress(ffmpeg);
-      let hasProgress = false;
-      ffmpegProgressHandler = ({ progress }) => {
-        hasProgress = true;
-        setConversionProgress(Math.round(Math.min(1, Math.max(0, progress)) * 100));
-      };
-      ffmpeg.on('progress', ffmpegProgressHandler);
-
-      setConversionProgress(0);
-      await ffmpeg.writeFile(inputName, new Uint8Array(await blob.arrayBuffer()));
-      await ffmpeg.exec([
-        '-i', inputName,
-        '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-        '-c:a', 'aac', '-b:a', '128k',
-        '-movflags', '+faststart',
-        outputName
-      ]);
-
-      setConversionProgress(100);
-      const data = await ffmpeg.readFile(outputName);
-      await ffmpeg.deleteFile(inputName);
-      await ffmpeg.deleteFile(outputName);
-      detachFFmpegProgress(ffmpeg);
-
-      if (!hasProgress) setConversionProgress(100);
-      return new Blob([data], { type: 'video/mp4' });
-    }
-
-    async function saveBlobToDisk(blob, filename) {
-      if (window.showSaveFilePicker) {
-        try {
-          const handle = await window.showSaveFilePicker({
-            suggestedName: filename,
-            types: [{ description: 'MP4 Videos', accept: { 'video/mp4': ['.mp4'] } }]
-          });
-          const writable = await handle.createWritable();
-          await writable.write(blob);
-          await writable.close();
-          return;
-        } catch (err) {
-          if (err.name === 'AbortError') throw err;
-        }
-      }
-
-      const downloadUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = downloadUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(downloadUrl);
-      }, 60000);
-    }
-
-    downloadBtn.addEventListener('click', async () => {
-      if (!currentVideoBlob || isConverting) return;
-
-      isConverting = true;
-      downloadBtn.disabled = true;
-      setConversionProgress(0);
-
-      try {
-        const mp4Blob = await convertRecordingToMP4(currentVideoBlob);
-
-        const defaultName = generateSaveFilename();
-        const customName = prompt('Save as:', defaultName);
-        if (!customName) {
-          downloadBtn.innerText = 'Save';
-          return;
-        }
-        const filename = customName.endsWith('.mp4') ? customName : `${customName}.mp4`;
-
-        await saveBlobToDisk(mp4Blob, filename);
-        downloadBtn.innerText = 'Save';
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          downloadBtn.innerText = 'Save';
-          return;
-        }
-        console.error('Save failed:', err);
-        alert(`Conversion failed: ${err.message || err}\n\nTap Save to retry.`);
-        downloadBtn.innerText = 'Save';
-      } finally {
-        isConverting = false;
-        downloadBtn.disabled = false;
-      }
-    });
-  </script>
+<!-- PASSWORD GATE OVERLAY -->
+<div id="passwordGate">
+<div class="gate-card">
+<h2>SECURE PORTAL</h2>
+<p>Please enter your access key to begin.</p>
+<input type="password" id="gatePass" class="gate-input" placeholder="••••••••" autofocus>
+<button onclick=\"unlockPortal()\" class="gate-btn">Unlock</button>
+<div id="gateError" class="gate-error">Loading security database... Please wait.</div>
+</div>
+</div>
+<button id="signOutBtn" onclick="handleSignOut()">Sign Out</button>
+<!-- MAIN APP CONTAINER -->
+<div id="appContent">
+<div class="container">
+<div class="box" id="videoBox">
+<div class="label" id="refLabel">REFERENCE LESSON</div>
+<div id="refVideoContainer">
+<video id="refVideo" poster="https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg" preload="auto" crossorigin="anonymous" playsinline webkit-playsinline></video>
+</div>
+<div id="videoWatermark"></div>
+<div class="countdown-overlay" id="countdown">3</div>
+</div>
+<div class="box" id="cameraBox">
+<div class="label" id="streamLabel"><span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span></div>
+<div class="rec-indicator" id="recBadge">● RECORDING</div>
+<div class="viewfinder-container">
+<!-- Separated elements isolate live camera initialization vs playback file streaming -->
+<video id="viewfinder" class="video-track active-view" autoplay playsinline webkit-playsinline muted></video>
+<video id="reviewPlayer" class="video-track" playsinline webkit-playsinline></video>
+<div id="cameraOverlay" class="viewfinder-overlay"></div>
+</div>
+<div class="zoom-container" id="zoomUi"><input type="range" id="zoomSlider" class="zoom-slider" min="1" max="2" step="0.1" value="1"><label id="zoomLabel">1.0x</label></div>
+</div>
+</div>
+<div class="ref-timeline-footer" id="refTimeline">
+<input type="range" id="refScrubSlider" class="ref-timeline-slider" min="0" max="100" step="0.1" value="0">
+<div class="ref-time-display" id="refTimeLabel">0:00</div>
+</div>
+<div class="timeline-footer" id="masterTimeline">
+<input type="range" id="scrubSlider" class="timeline-slider" min="0" max="100" step="0.1" value="0">
+<div class="time-display" id="timeLabel">0:00</div>
+<div class="mute-btn-container"><button class="mute-btn is-muted" id="muteReviewBtn">Muted</button></div>
+</div>
+<div class="controls-footer">
+<button id="previewRefBtn" class="custom-png-btn">Preview Ref</button>
+<button id="actionBtn" class="custom-png-btn">Start Session</button>
+<button id="resetBtn" class="custom-png-btn" disabled>Reset / Clear</button>
+<button id="overlayToggleBtn" class="custom-png-btn">Overlay On</button>
+<select id="opacitySelector" class="custom-select-ui">
+<option value="0.1">10%</option>
+<option value="0.2">20%</option>
+<option value="0.3" selected>30%</option>
+<option value="0.4">40%</option>
+<option value="0.5">50%</option>
+<option value="0.6">60%</option>
+<option value="0.7">70%</option>
+<option value="0.8">80%</option>
+<option value="0.9">90%</option>
+<option value="1.0">100%</option>
+</select>
+<button id="downloadBtn" class="custom-png-btn">Save</button>
+<div class="version-tag">V29.7</div>
+</div>
+</div>
+<script>
+const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1fxQrloklFsVMvy1-hf5kouhH1w0N_gaPy26uA5jT7S8/gviz/tq?tqx=out:csv";
+const BUNNY_HLS_URL = "https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/playlist.m3u8";
+const THUMBNAIL_ASSET = "https://vz-1e14ed9f-aa1.b-cdn.net/2602db24-b9dd-48ec-9ba9-54c53ed60342/thumbnail.jpg";
+let userDatabase = {};
+let authorizedUser = "";
+let watermarkTimer = null;
+let hlsInstance = null;
+let webAudioContext = null;
+let webAudioSourceNode = null;
+let webAudioGainNode = null;
+const refVideo = document.getElementById('refVideo');
+const gateError = document.getElementById('gateError');
+const watermarkEl = document.getElementById('videoWatermark');
+const signOutBtn = document.getElementById('signOutBtn');
+const viewfinder = document.getElementById('viewfinder');
+const reviewPlayer = document.getElementById('reviewPlayer');
+const cameraOverlay = document.getElementById('cameraOverlay');
+const actionBtn = document.getElementById('actionBtn');
+const previewRefBtn = document.getElementById('previewRefBtn');
+const overlayToggleBtn = document.getElementById('overlayToggleBtn');
+const opacitySelector = document.getElementById('opacitySelector');
+const resetBtn = document.getElementById('resetBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const muteReviewBtn = document.getElementById('muteReviewBtn');
+const countdown = document.getElementById('countdown');
+const recBadge = document.getElementById('recBadge');
+const streamLabel = document.getElementById('streamLabel');
+const refLabel = document.getElementById('refLabel');
+const cameraBox = document.getElementById('cameraBox');
+const zoomSlider = document.getElementById('zoomSlider');
+const zoomLabel = document.getElementById('zoomLabel');
+const zoomUi = document.getElementById('zoomUi');
+const masterTimeline = document.getElementById('masterTimeline');
+const scrubSlider = document.getElementById('scrubSlider');
+const timeLabel = document.getElementById('timeLabel');
+const refTimeline = document.getElementById('refTimeline');
+const refScrubSlider = document.getElementById('refScrubSlider');
+const refTimeLabel = document.getElementById('refTimeLabel');
+let mediaRecorder = null, recordedChunks = [], liveStream = null, isRecordingMode = false, isReviewMode = false, isReviewPlaying = false, isPreviewingRef = false, zoomFadeTimeout = null, isUserScrubbing = false, chosenScale = 1, currentVideoBlob = null, isSeeking = false;
+let reviewPlaybackUrl = null, ffmpegInstance = null, ffmpegLoadPromise = null, isConverting = false, ffmpegProgressHandler = null;
+let overlayActive = true;
+const PRE_RECORD_ALIGN_TIME = 20;
+
+refVideo.addEventListener('loadstart', () => {
+refVideo.setAttribute('poster', THUMBNAIL_ASSET);
+});
+
+async function fetchAccessDatabase() {
+try {
+const response = await fetch(GOOGLE_SHEET_CSV_URL);
+if (!response.ok) throw new Error("Database sync failed");
+const csvText = await response.text();
+const lines = csvText.split(/\r?\n/);
+lines.forEach(line => {
+const columns = line.split(',').map(col => col.replace(/^"|"$/g, '').trim());
+if (columns[0] && columns[1]) userDatabase[columns[0].toLowerCase()] = columns[1];
+});
+if (gateError) { gateError.style.display = 'none'; gateError.innerText = "Incorrect passcode. Please try again."; }
+} catch (err) {
+if (gateError) { gateError.style.display = 'block'; gateError.innerText = "Security database offline."; }
+}
+}
+fetchAccessDatabase();
+
+function unlockPortal() {
+const passInput = document.getElementById('gatePass');
+const input = passInput ? passInput.value.trim().toLowerCase() : "";
+if (userDatabase[input]) {
+authorizedUser = userDatabase[input];
+document.getElementById('passwordGate').style.display = 'none';
+document.getElementById('appContent').style.display = 'flex';
+signOutBtn.style.display = 'block';
+if (Hls.isSupported()) {
+hlsInstance = new Hls({
+enableWorker: true,
+lowLatencyMode: true,
+maxBufferLength: 30,
+maxMaxBufferLength: 600,
+backBufferLength: 90,
+appendErrorMaxRetry: 5
+});
+hlsInstance.loadSource(BUNNY_HLS_URL);
+hlsInstance.attachMedia(refVideo);
+} else if (refVideo.canPlayType('application/vnd.apple.mpegurl')) {
+refVideo.src = BUNNY_HLS_URL;
+}
+startWatermarkEngine();
+initCamera();
+} else {
+if (gateError) gateError.style.display = 'block';
+if (passInput) passInput.value = '';
+}
+}
+
+function handleSignOut() {
+cleanupIsolatedAudioPipeline();
+clearTimeout(zoomFadeTimeout);
+if (watermarkTimer) clearInterval(watermarkTimer);
+if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+if (liveStream) liveStream.getTracks().forEach(track => track.stop());
+if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+isRecordingMode = false; isReviewMode = false; isReviewPlaying = false; isPreviewingRef = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1; isSeeking = false; isConverting = false;
+if (reviewPlaybackUrl) { URL.revokeObjectURL(reviewPlaybackUrl); reviewPlaybackUrl = null; }
+refVideo.pause(); refVideo.removeAttribute('src'); refVideo.setAttribute('poster', THUMBNAIL_ASSET); refVideo.load();
+viewfinder.pause();
+viewfinder.srcObject = null;
+reviewPlayer.pause();
+removeVideoEndedListener();
+reviewPlayer.removeAttribute('src');
+reviewPlayer.load();
+reviewPlayer.classList.remove('active-view');
+viewfinder.classList.add('active-view');
+watermarkEl.style.display = 'none'; signOutBtn.style.display = 'none';
+document.getElementById('appContent').style.display = 'none';
+reviewPlayer.muted = true; muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
+masterTimeline.classList.remove('show'); refTimeline.classList.remove('show'); downloadBtn.style.display = "none";
+downloadBtn.disabled = false; downloadBtn.innerText = "Save";
+zoomSlider.value = 1; zoomLabel.innerText = "1.0x"; viewfinder.style.transform = "scale(1)";
+zoomUi.style.display = "flex"; recBadge.style.display = "none"; streamLabel.classList.remove('review-active');
+streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
+previewRefBtn.classList.remove('hidden'); previewRefBtn.innerText = "Preview Ref"; previewRefBtn.className = "custom-png-btn";
+overlayToggleBtn.classList.remove('hidden'); opacitySelector.classList.remove('hidden');
+overlayToggleBtn.disabled = false; opacitySelector.disabled = false; overlayActive = true;
+cameraOverlay.classList.remove('hidden');
+actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
+resetBtn.innerText = "Reset / Clear"; resetBtn.disabled = true; resetBtn.style.display = "none"; resetBtn.classList.remove('danger-active');
+const passInput = document.getElementById('gatePass'); if (passInput) passInput.value = '';
+document.getElementById('passwordGate').style.display = 'flex';
+}
+
+document.getElementById('gatePass').addEventListener('keypress', function(e) { if (e.key === 'Enter') unlockPortal(); });
+
+function startWatermarkEngine() {
+watermarkEl.innerText = `${authorizedUser} • DRAFT PREVIEW`;
+watermarkEl.style.display = 'block';
+const moveWatermark = () => {
+const container = refVideo.parentElement;
+const maxX = container.clientWidth - watermarkEl.clientWidth - 24;
+const maxY = container.clientHeight - watermarkEl.clientHeight - 24;
+const randomX = Math.max(12, Math.floor(Math.random() * maxX));
+const randomY = Math.max(12, Math.floor(Math.random() * maxY));
+watermarkEl.style.left = `${randomX}px`; watermarkEl.style.top = `${randomY}px`;
+};
+moveWatermark(); watermarkTimer = setInterval(moveWatermark, 4500);
+}
+
+async function initCamera() {
+try {
+if (liveStream) {
+liveStream.getTracks().forEach(t => t.stop());
+}
+liveStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 360 } }, audio: true });
+viewfinder.srcObject = liveStream;
+resetZoomFadeTimer(); setupInitialState();
+} catch (err) { setupInitialState(); }
+}
+
+function setupInitialState() {
+if (!isReviewMode && !isRecordingMode) {
+if (!isPreviewingRef) {
+refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
+refVideo.pause();
+refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing alignment framework (${PRE_RECORD_ALIGN_TIME}s)</span>`;
+}
+if (overlayActive) { cameraOverlay.classList.remove('hidden'); }
+overlayToggleBtn.classList.remove('hidden');
+opacitySelector.classList.remove('hidden');
+masterTimeline.classList.remove('show');
+refTimeline.classList.remove('show');
+previewRefBtn.classList.remove('hidden');
+}
+}
+
+function resetZoomFadeTimer() {
+if (isReviewMode) return;
+zoomUi.classList.remove('fade-out'); clearTimeout(zoomFadeTimeout);
+zoomFadeTimeout = setTimeout(() => { if (!isReviewMode) zoomUi.classList.add('fade-out'); }, 3000);
+}
+cameraBox.addEventListener('mousemove', resetZoomFadeTimer);
+cameraBox.addEventListener('touchstart', resetZoomFadeTimer);
+
+zoomSlider.addEventListener('input', (e) => {
+chosenScale = parseFloat(e.target.value); zoomLabel.innerText = `${chosenScale.toFixed(1)}x`;
+viewfinder.style.transform = `scale(${chosenScale})`; resetZoomFadeTimer();
+});
+opacitySelector.addEventListener('change', (e) => { cameraOverlay.style.opacity = e.target.value; });
+
+overlayToggleBtn.addEventListener('click', () => {
+overlayActive = !overlayActive;
+if (overlayActive) {
+cameraOverlay.classList.remove('hidden');
+overlayToggleBtn.innerText = "Overlay On"; overlayToggleBtn.classList.remove('overlay-off');
+} else {
+cameraOverlay.classList.add('hidden');
+overlayToggleBtn.innerText = "Overlay Off"; overlayToggleBtn.classList.add('overlay-off');
+}
+});
+
+previewRefBtn.addEventListener('click', () => {
+if (isRecordingMode || isReviewMode) return;
+if (!isPreviewingRef) {
+isPreviewingRef = true;
+previewRefBtn.innerText = "Pause Preview";
+previewRefBtn.classList.add('previewing');
+refLabel.innerHTML = `<span>REFERENCE LESSON (PREVIEWING)</span>`;
+refVideo.currentTime = 0;
+if (refVideo.duration && isFinite(refVideo.duration) && refVideo.duration > 0) {
+refScrubSlider.max = refVideo.duration;
+refScrubSlider.value = 0;
+updateRefTimeDisplay(0);
+refTimeline.classList.add('show');
+}
+refVideo.play().catch(() => {});
+} else {
+isPreviewingRef = false;
+previewRefBtn.innerText = "Preview Ref";
+previewRefBtn.classList.remove('previewing');
+refVideo.pause();
+refTimeline.classList.remove('show');
+setupInitialState();
+}
+});
+
+actionBtn.addEventListener('click', () => {
+if (!isRecordingMode && !isReviewMode) {
+if (isPreviewingRef) {
+isPreviewingRef = false;
+previewRefBtn.innerText = "Preview Ref";
+previewRefBtn.classList.remove('previewing');
+refVideo.pause();
+}
+startCountdown();
+} else if (isRecordingMode) {
+stopRecordingSession();
+} else if (isReviewMode) {
+if (!isReviewPlaying) { playBoth(); } else { pauseBoth(); }
+}
+});
+
+function startCountdown() {
+actionBtn.disabled = true;
+resetBtn.disabled = true;
+previewRefBtn.disabled = true;
+let count = 3;
+countdown.innerText = count;
+countdown.classList.add('show');
+refVideo.currentTime = 0;
+refVideo.pause();
+const interval = setInterval(() => {
+count--;
+if (count > 0) {
+countdown.innerText = count;
+} else {
+clearInterval(interval);
+countdown.classList.remove('show');
+startRecordingSession();
+}
+}, 1000);
+}
+
+function handleVideoTrackFinished() {
+if (isRecordingMode) {
+stopRecordingSession();
+}
+}
+
+function startRecordingSession() {
+isRecordingMode = true;
+recordedChunks = [];
+recBadge.style.display = "block";
+refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
+actionBtn.innerText = "Stop Session";
+actionBtn.className = "custom-png-btn btn-recording";
+actionBtn.disabled = false;
+resetBtn.style.display = "none";
+resetBtn.disabled = true;
+previewRefBtn.classList.add('hidden');
+overlayToggleBtn.classList.remove('hidden');
+opacitySelector.classList.remove('hidden');
+if (overlayActive) {
+cameraOverlay.classList.remove('hidden');
+} else {
+cameraOverlay.classList.add('hidden');
+}
+masterTimeline.classList.remove('show'); refTimeline.classList.remove('show');
+refVideo.addEventListener('ended', handleVideoTrackFinished);
+
+// Configure structural native WebM recording targets
+let options = { mimeType: 'video/webm;codecs=vp8,opus' };
+if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+options = { mimeType: 'video/webm' };
+}
+
+try {
+mediaRecorder = new MediaRecorder(liveStream, options);
+mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
+mediaRecorder.onstop = () => {
+currentVideoBlob = new Blob(recordedChunks, { type: 'video/webm' });
+setupReviewModePipeline();
+};
+refVideo.currentTime = 0;
+refVideo.play().then(() => {
+mediaRecorder.start();
+}).catch(() => {
+mediaRecorder.start();
+});
+} catch (err) {
+isRecordingMode = false;
+previewRefBtn.disabled = false;
+setupInitialState();
+}
+}
+
+function stopRecordingSession() {
+if (!isRecordingMode) return;
+isRecordingMode = false;
+refVideo.removeEventListener('ended', handleVideoTrackFinished);
+refVideo.pause();
+recBadge.style.display = "none";
+if (mediaRecorder && mediaRecorder.state !== "inactive") {
+mediaRecorder.stop();
+}
+}
+
+function setupReviewModePipeline() {
+isReviewMode = true;
+isReviewPlaying = false;
+isSeeking = false;
+actionBtn.innerText = "Play Review";
+actionBtn.className = "custom-png-btn";
+actionBtn.disabled = false;
+resetBtn.innerText = "Reset / Clear";
+resetBtn.disabled = false;
+resetBtn.style.display = "block";
+resetBtn.classList.remove('danger-active');
+downloadBtn.style.display = "block";
+downloadBtn.disabled = false;
+downloadBtn.innerText = "Save";
+isConverting = false;
+previewRefBtn.classList.add('hidden');
+overlayToggleBtn.classList.add('hidden');
+opacitySelector.classList.add('hidden');
+cameraOverlay.classList.add('hidden');
+zoomUi.style.display = "none";
+streamLabel.classList.add('review-active');
+streamLabel.innerHTML = `<span>YOU (REVIEW PLAYBACK)</span>`;
+refLabel.innerHTML = `<span>REFERENCE LESSON (REVIEW PLAYBACK)</span>`;
+refVideo.pause();
+refVideo.currentTime = 0;
+viewfinder.classList.remove('active-view');
+reviewPlayer.classList.add('active-view');
+if (reviewPlaybackUrl) URL.revokeObjectURL(reviewPlaybackUrl);
+reviewPlaybackUrl = URL.createObjectURL(currentVideoBlob);
+reviewPlayer.src = reviewPlaybackUrl;
+reviewPlayer.load();
+if (chosenScale && chosenScale > 0) {
+reviewPlayer.style.transform = `scale(${chosenScale})`;
+}
+reviewPlayer.muted = true;
+try {
+const audioSetupSuccess = setupIsolatedAudioPipeline(reviewPlayer);
+if (audioSetupSuccess && webAudioGainNode) {
+webAudioGainNode.gain.setValueAtTime(0, webAudioContext.currentTime);
+if (webAudioContext && webAudioContext.state !== 'suspended') {
+webAudioContext.suspend();
+}
+}
+} catch (e) {
+console.error('Audio setup error:', e);
+}
+muteReviewBtn.innerText = "Muted";
+muteReviewBtn.classList.add('is-muted');
+reviewPlayer.onloadedmetadata = () => {
+let recordedDuration = reviewPlayer.duration;
+if (recordedDuration === Infinity || recordedDuration === 0 || isNaN(recordedDuration)) {
+recordedDuration = 0;
+}
+scrubSlider.max = recordedDuration;
+scrubSlider.value = 0;
+updateTimeDisplayLabel(0);
+masterTimeline.classList.add('show');
+reviewPlayer.pause();
+refVideo.currentTime = 0;
+refVideo.pause();
+};
+}
+
+// Download Button listener configured to rename output container directly to .mp4
+downloadBtn.addEventListener('click', () => {
+if (!currentVideoBlob) return;
+const url = URL.createObjectURL(currentVideoBlob);
+const a = document.createElement('a');
+a.href = url;
+a.download = `performance-review-${Date.now()}.mp4`;
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+URL.revokeObjectURL(url);
+});
+
+function setupIsolatedAudioPipeline(videoElement) {
+try {
+if (!webAudioContext) {
+webAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+}
+if (!webAudioSourceNode) {
+webAudioSourceNode = webAudioContext.createMediaElementSource(videoElement);
+webAudioGainNode = webAudioContext.createGain();
+webAudioSourceNode.connect(webAudioGainNode);
+webAudioGainNode.connect(webAudioContext.destination);
+}
+return true;
+} catch (e) {
+return false;
+}
+}
+
+function cleanupIsolatedAudioPipeline() {
+if (webAudioContext) {
+if (webAudioContext.state !== 'closed') {
+webAudioContext.close();
+}
+webAudioContext = null;
+webAudioSourceNode = null;
+webAudioGainNode = null;
+}
+}
+</script>
 </body>
 </html>
