@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kapa Sync Performance Review (V29.9-Phantom Build)</title>
+  <title>Sync Performance Review (V29.9 - Phantom Samurai)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -269,8 +269,6 @@
     .custom-select-ui:disabled { opacity: 0.4; cursor: not-allowed; }
 
     #downloadBtn { background-color: #34c759; border-radius: 8px; display: none; }
-    #downloadBtn.save-pending { background-color: #ff9500; }
-    #downloadBtn.save-error { background-color: #ff3b30; }
     .version-tag { color: #556; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; font-family: 'Marcellus', serif; position: absolute; right: 4px; }
     .countdown-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: bold; color: #fff; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
     .countdown-overlay.show { opacity: 1; }
@@ -281,7 +279,7 @@
       position: absolute;
       pointer-events: none;
       color: rgba(255, 255, 255, 0.14);
-      font-size: 26px;
+      font-size: 32px;
       font-weight: bold;
       font-family: 'Marcellus', serif;
       text-transform: uppercase;
@@ -314,7 +312,7 @@
   <div id="appContent">
     <div class="container">
       <div class="box" id="videoBox">
-        <div class="label" id="refLabel">REFERENCE LESSON</div>
+        <div class="label" id="refLabel">REFERENCE VIDEO</div>
         
         <div id="refVideoContainer">
           <video id="refVideo" 
@@ -368,7 +366,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V29.9 (Phantom Samurai)</div>
+      <div class="version-tag">V29.7</div>
     </div>
   </div>
 
@@ -420,16 +418,6 @@
     let reviewPlaybackUrl = null, ffmpegInstance = null, ffmpegLoadPromise = null, isConverting = false, ffmpegProgressHandler = null;
     let overlayActive = true; 
     const PRE_RECORD_ALIGN_TIME = 20;
-
-    // --- Save/Share state ---
-    // A blob+filename that is ready to be written to disk/shared, waiting on a fresh
-    // user tap (mobile browsers require the actual save/share call to happen inside
-    // a "live" user gesture - if too much async time has passed since the tap that
-    // started conversion, the call silently does nothing on iOS Safari especially).
-    let pendingSaveBlob = null;
-    let pendingSaveFilename = null;
-    const FFMPEG_LOAD_TIMEOUT_MS = 45000;
-    const FFMPEG_CONVERT_TIMEOUT_MS = 120000;
 
     refVideo.addEventListener('loadstart', () => {
       refVideo.setAttribute('poster', THUMBNAIL_ASSET);
@@ -492,7 +480,6 @@
       if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
       
       isRecordingMode = false; isReviewMode = false; isReviewPlaying = false; isPreviewingRef = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1; isSeeking = false; isConverting = false;
-      pendingSaveBlob = null; pendingSaveFilename = null;
       if (reviewPlaybackUrl) { URL.revokeObjectURL(reviewPlaybackUrl); reviewPlaybackUrl = null; }
       refVideo.pause(); refVideo.removeAttribute('src'); refVideo.setAttribute('poster', THUMBNAIL_ASSET); refVideo.load();
       
@@ -512,10 +499,10 @@
       
       reviewPlayer.muted = true; muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
       masterTimeline.classList.remove('show'); refTimeline.classList.remove('show'); downloadBtn.style.display = "none";
-      downloadBtn.disabled = false; downloadBtn.innerText = "Save"; downloadBtn.classList.remove('save-pending', 'save-error');
+      downloadBtn.disabled = false; downloadBtn.innerText = "Save";
       zoomSlider.value = 1; zoomLabel.innerText = "1.0x"; viewfinder.style.transform = "scale(1)";
       zoomUi.style.display = "flex"; recBadge.style.display = "none"; streamLabel.classList.remove('review-active');
-      streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Adjust the Zoom to Match the Reference Video</span>`;
+      streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
       
       previewRefBtn.classList.remove('hidden'); previewRefBtn.innerText = "Preview Ref"; previewRefBtn.className = "custom-png-btn";
       overlayToggleBtn.classList.remove('hidden'); opacitySelector.classList.remove('hidden');
@@ -530,7 +517,7 @@
     document.getElementById('gatePass').addEventListener('keypress', function(e) { if (e.key === 'Enter') unlockPortal(); });
 
     function startWatermarkEngine() {
-      watermarkEl.innerText = `${authorizedUser} • 07-2026`;
+      watermarkEl.innerText = `${authorizedUser} • DRAFT PREVIEW`;
       watermarkEl.style.display = 'block';
       const moveWatermark = () => {
         const container = refVideo.parentElement;
@@ -672,8 +659,6 @@
     function startRecordingSession() {
       isRecordingMode = true;
       recordedChunks = [];
-      pendingSaveBlob = null;
-      pendingSaveFilename = null;
       
       recBadge.style.display = "block";
       refLabel.innerHTML = `<span>REFERENCE LESSON</span>`;
@@ -698,14 +683,11 @@
 
       refVideo.addEventListener('ended', handleVideoTrackFinished);
 
-      let mimeType = 'video/mp4';
+      let mimeType = 'video/webm;codecs=vp9,opus';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'video/webm;codecs=vp9,opus';
+        mimeType = 'video/webm;codecs=vp8,opus';
         if (!MediaRecorder.isTypeSupported(mimeType)) {
-          mimeType = 'video/webm;codecs=vp8,opus';
-          if (!MediaRecorder.isTypeSupported(mimeType)) {
-            mimeType = MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : '';
-          }
+          mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : '';
         }
       }
       const options = mimeType ? { mimeType } : {};
@@ -748,8 +730,6 @@
       isReviewMode = true;
       isReviewPlaying = false;
       isSeeking = false;
-      pendingSaveBlob = null;
-      pendingSaveFilename = null;
 
       actionBtn.innerText = "Play Review";
       actionBtn.className = "custom-png-btn";
@@ -763,7 +743,6 @@
       downloadBtn.style.display = "block";
       downloadBtn.disabled = false;
       downloadBtn.innerText = "Save";
-      downloadBtn.classList.remove('save-pending', 'save-error');
       isConverting = false;
       previewRefBtn.classList.add('hidden');
 
@@ -1106,9 +1085,6 @@
       isPreviewingRef = false;
       recordedChunks = [];
       currentVideoBlob = null;
-      pendingSaveBlob = null;
-      pendingSaveFilename = null;
-      isConverting = false;
       if (reviewPlaybackUrl) { URL.revokeObjectURL(reviewPlaybackUrl); reviewPlaybackUrl = null; }
 
       // Unload playback track safely
@@ -1125,7 +1101,7 @@
       downloadBtn.style.display = "none";
       downloadBtn.disabled = false;
       downloadBtn.innerText = "Save";
-      downloadBtn.classList.remove('save-pending', 'save-error');
+      isConverting = false;
       zoomUi.style.display = "flex";
       resetBtn.style.display = "none";
       resetBtn.disabled = true;
@@ -1149,7 +1125,7 @@
       setupInitialState();
     }
 
-    function generateSaveFilename(ext) {
+    function generateSaveFilename() {
       const displayName = (authorizedUser || 'User')
         .trim()
         .split(/\s+/)
@@ -1159,15 +1135,7 @@
       const now = new Date();
       const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const time = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-      return `${displayName}_Performance_Review_${date}_${time}.${ext || 'mp4'}`;
-    }
-
-    function withTimeout(promise, ms, message) {
-      let timer;
-      const timeout = new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error(message || 'Operation timed out')), ms);
-      });
-      return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+      return `${displayName}_Performance_Review_${date}_${time}.mp4`;
     }
 
     async function loadFFmpeg() {
@@ -1176,20 +1144,16 @@
 
       ffmpegLoadPromise = (async () => {
         if (!window.FFmpegWASM || !window.FFmpegUtil) {
-          throw new Error('Video converter failed to load. Check your connection and refresh.');
+          throw new Error('FFmpeg libraries failed to load. Check your connection and refresh.');
         }
         const { FFmpeg } = FFmpegWASM;
         const { toBlobURL } = FFmpegUtil;
         const ffmpeg = new FFmpeg();
         const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
-        await withTimeout(
-          ffmpeg.load({
-            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-          }),
-          FFMPEG_LOAD_TIMEOUT_MS,
-          'Video converter took too long to load. Your connection may be too slow for on-device conversion.'
-        );
+        await ffmpeg.load({
+          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        });
         ffmpegInstance = ffmpeg;
         return ffmpeg;
       })();
@@ -1204,11 +1168,11 @@
 
     function setConversionProgress(pct) {
       if (pct >= 100) {
-        downloadBtn.innerText = 'Finishing...';
+        downloadBtn.innerText = 'Downloading...';
       } else if (pct > 0) {
         downloadBtn.innerText = `${pct}%`;
       } else {
-        downloadBtn.innerText = 'Converting...';
+        downloadBtn.innerText = 'Saving...';
       }
     }
 
@@ -1236,18 +1200,13 @@
 
       setConversionProgress(0);
       await ffmpeg.writeFile(inputName, new Uint8Array(await blob.arrayBuffer()));
-
-      await withTimeout(
-        ffmpeg.exec([
-          '-i', inputName,
-          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '25',
-          '-c:a', 'aac', '-b:a', '128k',
-          '-movflags', '+faststart',
-          outputName
-        ]),
-        FFMPEG_CONVERT_TIMEOUT_MS,
-        'Conversion took too long on this device.'
-      );
+      await ffmpeg.exec([
+        '-i', inputName,
+        '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+        '-c:a', 'aac', '-b:a', '128k',
+        '-movflags', '+faststart',
+        outputName
+      ]);
 
       setConversionProgress(100);
       const data = await ffmpeg.readFile(outputName);
@@ -1259,35 +1218,7 @@
       return new Blob([data], { type: 'video/mp4' });
     }
 
-    function isMp4Blob(blob) {
-      return !!(blob && blob.type && blob.type.includes('mp4'));
-    }
-
-    // Returns a blob that is guaranteed to be MP4. Recordings that are already MP4
-    // (common on iOS Safari, which can record MediaRecorder output directly as MP4)
-    // skip the heavy ffmpeg.wasm transcode entirely - that's the main source of
-    // "stalling" on phones, since loading a ~25MB wasm core plus running a real-time
-    // encode is slow and memory-hungry on mobile.
-    async function getExportableMp4Blob(sourceBlob) {
-      if (isMp4Blob(sourceBlob)) return sourceBlob;
-      return await convertRecordingToMP4(sourceBlob);
-    }
-
-    // Tries, in order: native share sheet (best on mobile - lets the user save
-    // straight to Photos), the File System Access API (desktop Chrome/Edge), then a
-    // plain anchor-download fallback for everything else.
-    async function shareOrSaveBlob(blob, filename) {
-      try {
-        const file = new File([blob], filename, { type: blob.type || 'video/mp4' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: filename });
-          return 'shared';
-        }
-      } catch (err) {
-        if (err && err.name === 'AbortError') return 'cancelled';
-        console.warn('Share failed, falling back to direct save:', err);
-      }
-
+    async function saveBlobToDisk(blob, filename) {
       if (window.showSaveFilePicker) {
         try {
           const handle = await window.showSaveFilePicker({
@@ -1297,10 +1228,9 @@
           const writable = await handle.createWritable();
           await writable.write(blob);
           await writable.close();
-          return 'saved';
+          return;
         } catch (err) {
-          if (err && err.name === 'AbortError') return 'cancelled';
-          console.warn('showSaveFilePicker failed, falling back to anchor download:', err);
+          if (err.name === 'AbortError') throw err;
         }
       }
 
@@ -1315,92 +1245,36 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(downloadUrl);
       }, 60000);
-      return 'downloaded';
-    }
-
-    function resetDownloadButtonIdle() {
-      downloadBtn.innerText = 'Save';
-      downloadBtn.classList.remove('save-pending', 'save-error');
     }
 
     downloadBtn.addEventListener('click', async () => {
-      if (isConverting) return;
+      if (!currentVideoBlob || isConverting) return;
 
-      // Phase 2: a save is already staged - this tap is a *fresh* user gesture,
-      // which mobile browsers require in order to actually trigger a share/download.
-      if (pendingSaveBlob) {
-        const blob = pendingSaveBlob;
-        const filename = pendingSaveFilename;
-        downloadBtn.disabled = true;
-        try {
-          const result = await shareOrSaveBlob(blob, filename);
-          if (result === 'cancelled') {
-            downloadBtn.innerText = 'Tap to Save';
-          } else {
-            pendingSaveBlob = null;
-            pendingSaveFilename = null;
-            downloadBtn.classList.remove('save-pending', 'save-error');
-            downloadBtn.innerText = 'Saved!';
-            setTimeout(resetDownloadButtonIdle, 2000);
-          }
-        } catch (err) {
-          console.error('Save failed:', err);
-          downloadBtn.classList.add('save-error');
-          downloadBtn.innerText = 'Tap to Retry';
-        } finally {
-          downloadBtn.disabled = false;
-        }
-        return;
-      }
-
-      // Phase 1: prepare an MP4 blob (instant if already MP4, otherwise a real convert).
-      if (!currentVideoBlob) return;
       isConverting = true;
       downloadBtn.disabled = true;
-      downloadBtn.classList.remove('save-error');
       setConversionProgress(0);
 
-      const alreadyMp4 = isMp4Blob(currentVideoBlob);
-
       try {
-        const mp4Blob = await getExportableMp4Blob(currentVideoBlob);
-        const filename = generateSaveFilename('mp4');
+        const mp4Blob = await convertRecordingToMP4(currentVideoBlob);
 
-        if (alreadyMp4) {
-          // No async conversion happened, so we're still effectively inside the
-          // original tap - safe to save/share immediately.
-          const result = await shareOrSaveBlob(mp4Blob, filename);
-          if (result === 'cancelled') {
-            pendingSaveBlob = mp4Blob;
-            pendingSaveFilename = filename;
-            downloadBtn.classList.add('save-pending');
-            downloadBtn.innerText = 'Tap to Save';
-          } else {
-            downloadBtn.innerText = 'Saved!';
-            setTimeout(resetDownloadButtonIdle, 2000);
-          }
-        } else {
-          // Real conversion took real time - the original gesture has expired on
-          // most mobile browsers, so surface a fresh button instead of silently failing.
-          pendingSaveBlob = mp4Blob;
-          pendingSaveFilename = filename;
-          downloadBtn.classList.add('save-pending');
-          downloadBtn.innerText = 'Tap to Save';
+        const defaultName = generateSaveFilename();
+        const customName = prompt('Save as:', defaultName);
+        if (!customName) {
+          downloadBtn.innerText = 'Save';
+          return;
         }
+        const filename = customName.endsWith('.mp4') ? customName : `${customName}.mp4`;
+
+        await saveBlobToDisk(mp4Blob, filename);
+        downloadBtn.innerText = 'Save';
       } catch (err) {
-        console.error('Conversion failed:', err);
-        const fallbackToOriginal = confirm(
-          `MP4 conversion failed on this device (${err.message || err}).\n\nSave the original recording instead? It may not play everywhere but will still open on this device.`
-        );
-        if (fallbackToOriginal) {
-          const ext = currentVideoBlob.type.includes('webm') ? 'webm' : 'mp4';
-          pendingSaveBlob = currentVideoBlob;
-          pendingSaveFilename = generateSaveFilename(ext);
-          downloadBtn.classList.add('save-pending');
-          downloadBtn.innerText = 'Tap to Save';
-        } else {
-          resetDownloadButtonIdle();
+        if (err.name === 'AbortError') {
+          downloadBtn.innerText = 'Save';
+          return;
         }
+        console.error('Save failed:', err);
+        alert(`Conversion failed: ${err.message || err}\n\nTap Save to retry.`);
+        downloadBtn.innerText = 'Save';
       } finally {
         isConverting = false;
         downloadBtn.disabled = false;
