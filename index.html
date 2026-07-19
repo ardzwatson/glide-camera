@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Sync Performance Review (V29.9)</title>
+  <title>Kapa Sync Performance Review (V29.9)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -368,7 +368,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V29.8</div>
+      <div class="version-tag">V29.9 (Phantom Samurai)</div>
     </div>
   </div>
 
@@ -515,7 +515,7 @@
       downloadBtn.disabled = false; downloadBtn.innerText = "Save"; downloadBtn.classList.remove('save-pending', 'save-error');
       zoomSlider.value = 1; zoomLabel.innerText = "1.0x"; viewfinder.style.transform = "scale(1)";
       zoomUi.style.display = "flex"; recBadge.style.display = "none"; streamLabel.classList.remove('review-active');
-      streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
+      streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Adjust the Zoom to Match the Reference Video</span>`;
       
       previewRefBtn.classList.remove('hidden'); previewRefBtn.innerText = "Preview Ref"; previewRefBtn.className = "custom-png-btn";
       overlayToggleBtn.classList.remove('hidden'); opacitySelector.classList.remove('hidden');
@@ -530,7 +530,7 @@
     document.getElementById('gatePass').addEventListener('keypress', function(e) { if (e.key === 'Enter') unlockPortal(); });
 
     function startWatermarkEngine() {
-      watermarkEl.innerText = `${authorizedUser} • DRAFT PREVIEW`;
+      watermarkEl.innerText = `${authorizedUser} • 07-2026`;
       watermarkEl.style.display = 'block';
       const moveWatermark = () => {
         const container = refVideo.parentElement;
