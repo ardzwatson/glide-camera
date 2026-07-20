@@ -226,13 +226,14 @@
     .ref-time-display { font-family: 'Marcellus', serif; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
     
     .mute-btn-container { display: flex; align-items: center; justify-content: center; }
-    .mute-btn { font-family: 'Marcellus', serif; border: none; width: 90px; height: 32px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); background-color: #444; border-radius: 6px; }
-    .mute-btn.is-muted { background-color: #ff453a; }
+    .mute-btn { font-family: 'Marcellus', serif; border: none; width: 90px; height: 32px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); background: linear-gradient(135deg, #5c5c5e, #2c2c2e); border-radius: 6px; opacity: 0.9; transition: opacity 0.2s ease; }
+    .mute-btn:hover { opacity: 1.0; }
+    .mute-btn.is-muted { background: linear-gradient(135deg, #ff7a70, #cc2f26); }
     
     .controls-footer { height: 54px; display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 8px; position: relative; flex-shrink: 0; width: 100%; }
     
     button.custom-png-btn, .custom-select-ui {
-      opacity: 0.85;
+      opacity: 0.9;
       transition: opacity 0.2s ease, transform 0.1s ease, filter 0.2s;
     }
     button.custom-png-btn:hover, .custom-select-ui:hover { opacity: 1.0; }
@@ -242,23 +243,23 @@
     button.custom-png-btn:disabled { filter: grayscale(1) opacity(0.4); cursor: not-allowed; transform: none; }
     button.custom-png-btn.hidden { display: none !important; }
     
-    #actionBtn { background-color: #007aff; border-radius: 8px; }
-    #actionBtn.btn-recording { background-color: #ff453a !important; }
+    #actionBtn { background: linear-gradient(135deg, #3396ff, #0056b3); border-radius: 8px; }
+    #actionBtn.btn-recording { background: linear-gradient(135deg, #ff7a70, #cc2f26) !important; }
     
-    #previewRefBtn { background-color: #5856d6; border-radius: 8px; }
-    #previewRefBtn.previewing { background-color: #ff9500 !important; }
+    #previewRefBtn { background: linear-gradient(135deg, #8280e0, #3f3da3); border-radius: 8px; }
+    #previewRefBtn.previewing { background: linear-gradient(135deg, #ffb347, #cc7700) !important; }
     
-    #resetBtn { background-color: #8e8e93; border-radius: 8px; display: none; }
-    #resetBtn.danger-active { background-color: #ff3b30; }
+    #resetBtn { background: linear-gradient(135deg, #b0b0b5, #6c6c70); border-radius: 8px; display: none; }
+    #resetBtn.danger-active { background: linear-gradient(135deg, #ff6f66, #cc2c23); }
     
-    #overlayToggleBtn { background-color: #e5e5ea; color: #1c1c1e; border-radius: 8px; text-shadow: none; }
-    #overlayToggleBtn.overlay-off { background-color: #444 !important; color: white !important; opacity: 0.7; }
+    #overlayToggleBtn { background: linear-gradient(135deg, #ffffff, #c7c7cc); color: #1c1c1e; border-radius: 8px; text-shadow: none; }
+    #overlayToggleBtn.overlay-off { background: linear-gradient(135deg, #5c5c5e, #2c2c2e) !important; color: white !important; opacity: 0.7; }
     
     .custom-select-ui {
       font-family: 'Marcellus', serif;
       width: 115px;
       height: 44px;
-      background-color: #3a3a3c;
+      background: linear-gradient(135deg, #505052, #2a2a2c);
       color: white;
       border: 1px solid #48484a;
       border-radius: 8px;
@@ -272,9 +273,9 @@
     .custom-select-ui.hidden { display: none !important; }
     .custom-select-ui:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    #downloadBtn { background-color: #34c759; border-radius: 8px; display: none; }
-    #downloadBtn.save-pending { background-color: #ff9500; }
-    #downloadBtn.save-error { background-color: #ff3b30; }
+    #downloadBtn { background: linear-gradient(135deg, #5ed17d, #248f41); border-radius: 8px; display: none; }
+    #downloadBtn.save-pending { background: linear-gradient(135deg, #ffb347, #cc7700); }
+    #downloadBtn.save-error { background: linear-gradient(135deg, #ff6f66, #cc2c23); }
 
     .sync-offset-row {
       width: 100%;
@@ -298,7 +299,7 @@
       height: 30px;
       border: none;
       border-radius: 6px;
-      background-color: #3a3a3c;
+      background: linear-gradient(135deg, #505052, #2a2a2c);
       color: white;
       font-size: 16px;
       font-weight: bold;
@@ -306,8 +307,10 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: filter 0.15s, transform 0.1s;
+      opacity: 0.9;
+      transition: filter 0.15s, transform 0.1s, opacity 0.2s ease;
     }
+    .offset-btn:hover { opacity: 1.0; }
     .offset-btn:active { transform: scale(0.94); filter: brightness(0.85); }
     .offset-value {
       font-family: 'Marcellus', serif;
@@ -451,6 +454,9 @@
     let authorizedUser = "";
     let watermarkTimer = null;
     let hlsInstance = null;
+    // Read from column F, row 1 of the sheet - lets the watermark's trailing tag
+    // (e.g. a season/date label) be changed from the sheet without touching code.
+    let watermarkTag = "07-2026";
 
     let webAudioContext = null;
     let webAudioSourceNode = null;
@@ -589,6 +595,41 @@
       refVideo.setAttribute('poster', activeThumbnailUrl);
     });
 
+    // The Reference Video box doesn't actually show the poster/thumbnail once
+    // playback has loaded - it shows a real decoded frame, paused at
+    // PRE_RECORD_ALIGN_TIME. The static thumbnail.jpg is a different moment in
+    // the clip (usually near the very start), so using it for the camera overlay
+    // guide made the two look mismatched. This captures the exact frame the
+    // reference video is actually paused on and uses that for the overlay instead,
+    // so they're always identical - and it stays correct automatically even if
+    // PRE_RECORD_ALIGN_TIME or the per-user video changes later.
+    function captureRefFrameForOverlay() {
+      try {
+        if (!refVideo.videoWidth || !refVideo.videoHeight) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = refVideo.videoWidth;
+        canvas.height = refVideo.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(refVideo, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        cameraOverlay.style.backgroundImage = `url('${dataUrl}')`;
+      } catch (e) {
+        // Likely a CORS-tainted canvas (source not serving proper CORS headers) -
+        // silently keep whatever background image is already set (the thumbnail
+        // fallback applied at unlock) rather than breaking anything.
+        console.warn('Overlay frame capture failed, keeping thumbnail fallback:', e);
+      }
+    }
+
+    // Fires every time refVideo finishes seeking. Only capture while idle (not
+    // recording/reviewing/previewing), which is exactly when setupInitialState()
+    // seeks to the alignment frame.
+    refVideo.addEventListener('seeked', () => {
+      if (!isReviewMode && !isRecordingMode && !isPreviewingRef) {
+        captureRefFrameForOverlay();
+      }
+    });
+
     // Handles quoted fields (so commas inside a URL's query string, if any,
     // don't get mistaken for column separators) - the naive .split(',') this
     // replaces would silently mis-parse rows like that.
@@ -621,6 +662,13 @@
         if (!response.ok) throw new Error("Database sync failed");
         const csvText = await response.text();
         const lines = csvText.split(/\r?\n/);
+
+        // Cell F1 (row 1, column F / index 5) drives the watermark's trailing tag.
+        if (lines.length > 0 && lines[0].trim()) {
+          const headerColumns = parseCsvLine(lines[0]);
+          if (headerColumns[5]) watermarkTag = headerColumns[5].trim();
+        }
+
         lines.forEach(line => {
           if (!line.trim()) return;
           const columns = parseCsvLine(line);
@@ -780,7 +828,7 @@
     document.getElementById('gatePass').addEventListener('keypress', function(e) { if (e.key === 'Enter') unlockPortal(); });
 
     function startWatermarkEngine() {
-      watermarkEl.innerText = `${authorizedUser} • 07-2026`;
+      watermarkEl.innerText = `${authorizedUser} • ${watermarkTag}`;
       watermarkEl.style.display = 'block';
       const moveWatermark = () => {
         const container = refVideo.parentElement;
