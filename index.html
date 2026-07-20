@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kapa Sync Video Review (V30.1-Demon's Blade)</title>
+  <title>Kapa Sync Video Review (V30.2-Demon's Blade)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -351,6 +351,7 @@
       white-space: nowrap;
       text-shadow: 1px 1px 3px rgba(0,0,0,0.6);
       display: none;
+      text-align: center;
       user-select: none;
       -webkit-user-select: none;
     }
@@ -364,6 +365,7 @@
       #videoWatermark.watermark-active {
         display: flex;
         flex-direction: column;
+        align-items: center;
         font-size: 20px;
         white-space: normal;
         line-height: 1.3;
@@ -383,7 +385,7 @@
       <input type="password" id="gatePass" class="gate-input" placeholder="••••••••" autofocus>
       <button onclick="unlockPortal()" class="gate-btn">Tahuna Te Ahi</button>
       <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
-      <div class="gate-build-tag">v30.1 - Demon's Blade Build</div>
+      <div class="gate-build-tag">v30.2 - Demon's Blade Build</div>
     </div>
   </div>
 
@@ -454,7 +456,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V30.1</div>
+      <div class="version-tag">V30.2</div>
     </div>
   </div>
 
@@ -463,18 +465,21 @@
     // Fallback video shown if a user's sheet row leaves the HLS/Thumbnail columns blank.
     const DEFAULT_HLS_URL = "https://vz-1e14ed9f-aa1.b-cdn.net/ed64b70f-c2ab-4fd9-acde-98b43fa4868e/playlist.m3u8";
     const DEFAULT_THUMBNAIL_URL = "https://vz-1e14ed9f-aa1.b-cdn.net/ed64b70f-c2ab-4fd9-acde-98b43fa4868e/thumbnail.jpg";
-    // The video actually loaded for the current session - set per-user at unlock time.
+    // Fallback alignment-frame time if a user's row leaves the Thumbnail Time column blank/invalid.
+    const DEFAULT_ALIGN_TIME = 20;
+    // The video/timing actually loaded for the current session - set per-user at unlock time.
     let activeHlsUrl = DEFAULT_HLS_URL;
     let activeThumbnailUrl = DEFAULT_THUMBNAIL_URL;
+    let activeAlignTime = DEFAULT_ALIGN_TIME;
     
     let userDatabase = {}; 
     let authorizedUser = "";
     let watermarkTimer = null;
     let hlsInstance = null;
-    // Read from column F, row 1 of the sheet - lets the watermark's trailing tag
+    // Read from column G, row 1 of the sheet - lets the watermark's trailing tag
     // (e.g. a season/date label) be changed from the sheet without touching code.
     let watermarkTag = "07-2026";
-    // Read from column F, row 2 - used only for the mobile watermark's second line.
+    // Read from column G, row 2 - used only for the mobile watermark's second line.
     let watermarkTagMobile = null;
 
     let webAudioContext = null;
@@ -518,7 +523,6 @@
     let mediaRecorder = null, recordedChunks = [], liveStream = null, isRecordingMode = false, isReviewMode = false, isReviewPlaying = false, isPreviewingRef = false, zoomFadeTimeout = null, isUserScrubbing = false, chosenScale = 1, currentVideoBlob = null, isSeeking = false;
     let reviewPlaybackUrl = null, ffmpegInstance = null, ffmpegLoadPromise = null, isConverting = false, ffmpegProgressHandler = null;
     let overlayActive = true; 
-    const PRE_RECORD_ALIGN_TIME = 25;
 
     // --- Countdown tone ---
     // Uses the Web Audio API to synthesize short beeps rather than loading an
@@ -729,15 +733,15 @@
         const csvText = await response.text();
         const lines = csvText.split(/\r?\n/);
 
-        // Cell F1 (row 1, column F / index 5) drives the watermark's trailing tag.
+        // Cell G1 (row 1, column G / index 6) drives the watermark's trailing tag.
         if (lines.length > 0 && lines[0].trim()) {
           const headerColumns = parseCsvLine(lines[0]);
-          if (headerColumns[5]) watermarkTag = headerColumns[5].trim();
+          if (headerColumns[6]) watermarkTag = headerColumns[6].trim();
         }
-        // Cell F2 (row 2, column F) drives the mobile-only second watermark line.
+        // Cell G2 (row 2, column G) drives the mobile-only second watermark line.
         if (lines.length > 1 && lines[1].trim()) {
           const row2Columns = parseCsvLine(lines[1]);
-          if (row2Columns[5]) watermarkTagMobile = row2Columns[5].trim();
+          if (row2Columns[6]) watermarkTagMobile = row2Columns[6].trim();
         }
 
         lines.forEach(line => {
@@ -747,16 +751,21 @@
           const name = columns[1] || '';
           const hlsUrl = (columns[2] || '').trim();
           const thumbnailUrl = (columns[3] || '').trim();
+          const thumbnailTimeRaw = (columns[4] || '').trim();
+          const thumbnailTime = thumbnailTimeRaw !== '' && !isNaN(parseFloat(thumbnailTimeRaw)) && parseFloat(thumbnailTimeRaw) >= 0
+            ? parseFloat(thumbnailTimeRaw)
+            : null;
 
           if (!passcode || !name) return;
           if (passcode === 'passcode' || passcode === 'passcodes') return; // skip a header row if present
 
-          // HLS URL/Thumbnail URL are optional per row - rows that leave them
-          // blank fall back to the default reference video.
+          // HLS URL/Thumbnail URL/Thumbnail Time are all optional per row - rows
+          // that leave them blank fall back to the defaults.
           userDatabase[passcode] = {
             name,
             hlsUrl: hlsUrl || null,
-            thumbnailUrl: thumbnailUrl || null
+            thumbnailUrl: thumbnailUrl || null,
+            thumbnailTime
           };
         });
         if (gateError) { gateError.style.display = 'none'; gateError.innerText = "Incorrect passcode. Please try again."; }
@@ -774,6 +783,7 @@
         authorizedUser = userRecord.name;
         activeHlsUrl = userRecord.hlsUrl || DEFAULT_HLS_URL;
         activeThumbnailUrl = userRecord.thumbnailUrl || DEFAULT_THUMBNAIL_URL;
+        activeAlignTime = (userRecord.thumbnailTime !== null && userRecord.thumbnailTime !== undefined) ? userRecord.thumbnailTime : DEFAULT_ALIGN_TIME;
 
         document.getElementById('passwordGate').style.display = 'none';
         document.getElementById('appContent').style.display = 'flex';
@@ -860,7 +870,7 @@
       
       isRecordingMode = false; isReviewMode = false; isReviewPlaying = false; isPreviewingRef = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1; isSeeking = false; isConverting = false;
       pendingSaveBlob = null; pendingSaveFilename = null;
-      activeHlsUrl = DEFAULT_HLS_URL; activeThumbnailUrl = DEFAULT_THUMBNAIL_URL;
+      activeHlsUrl = DEFAULT_HLS_URL; activeThumbnailUrl = DEFAULT_THUMBNAIL_URL; activeAlignTime = DEFAULT_ALIGN_TIME;
       cameraOverlay.style.backgroundImage = '';
       if (reviewPlaybackUrl) { URL.revokeObjectURL(reviewPlaybackUrl); reviewPlaybackUrl = null; }
       refVideo.pause(); refVideo.removeAttribute('src'); refVideo.setAttribute('poster', DEFAULT_THUMBNAIL_URL); refVideo.load();
@@ -944,9 +954,9 @@
     function setupInitialState() {
       if (!isReviewMode && !isRecordingMode) {
         if (!isPreviewingRef) {
-          refVideo.currentTime = PRE_RECORD_ALIGN_TIME;
+          refVideo.currentTime = activeAlignTime;
           refVideo.pause();
-          refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing alignment framework (${PRE_RECORD_ALIGN_TIME}s)</span>`;
+          refLabel.innerHTML = `<span>REFERENCE LESSON</span><span class="zoom-note">Showing alignment framework (${activeAlignTime}s)</span>`;
         }
         if (overlayActive) { cameraOverlay.classList.remove('hidden'); }
         overlayToggleBtn.classList.remove('hidden');
