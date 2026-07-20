@@ -383,7 +383,7 @@
       <input type="password" id="gatePass" class="gate-input" placeholder="••••••••" autofocus>
       <button onclick="unlockPortal()" class="gate-btn">Tahuna Te Ahi</button>
       <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
-      <div class="gate-build-tag">v30.0 - Demon's Blade Build</div>
+      <div class="gate-build-tag">v30.1 - Demon's Blade Build</div>
     </div>
   </div>
 
@@ -454,7 +454,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V30.0</div>
+      <div class="version-tag">V30.1</div>
     </div>
   </div>
 
@@ -662,10 +662,13 @@
       }
     }
 
-    // Camera overlay guide image: prefer the actual thumbnail URL (from the
-    // sheet, or the default) since that's a deliberately chosen image. Only if
-    // that URL fails to load do we fall back to grabbing a real frame from the
-    // reference video at a fixed 15s mark.
+    // Camera overlay guide image: shows the thumbnail URL as a quick placeholder
+    // while the reference video is still loading (or as the fallback captured
+    // 15s frame if that URL is broken). Once the reference video actually
+    // settles on its resting "alignment framework" frame, the listener below
+    // takes over and keeps the overlay permanently in sync with that exact
+    // frame - so the two only ever change once (placeholder -> matched), never
+    // drifting apart again afterwards.
     function applyOverlayThumbnail() {
       if (!activeThumbnailUrl) {
         captureFallbackOverlayFrame();
@@ -681,6 +684,17 @@
       };
       probe.src = activeThumbnailUrl;
     }
+
+    // Fires every time refVideo finishes seeking. Only while idle (not
+    // recording/reviewing/previewing) - which is exactly when setupInitialState()
+    // seeks to the alignment frame - re-capture that exact frame so the overlay
+    // stays permanently matched to whatever the Reference Video box is actually
+    // resting on, instead of staying frozen on the initial placeholder image.
+    refVideo.addEventListener('seeked', () => {
+      if (!isReviewMode && !isRecordingMode && !isPreviewingRef) {
+        captureRefFrameForOverlay();
+      }
+    });
 
     // Handles quoted fields (so commas inside a URL's query string, if any,
     // don't get mistaken for column separators) - the naive .split(',') this
