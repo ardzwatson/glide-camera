@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kapa Sync Video Review (V30.0-Demon's Blade)</title>
+  <title>Kapa Sync Video Review (V30.1-Demon's Blade)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -354,6 +354,23 @@
       user-select: none;
       -webkit-user-select: none;
     }
+    #videoWatermark.watermark-active { display: block; }
+    .wm-mobile-line { display: none; }
+
+    /* Mobile only: smaller text, stacked "Name / F2 text" layout instead of the
+       single-line "Name • F1 tag". Nothing above this query is touched, so
+       desktop sizing/layout stays exactly as it was. */
+    @media (max-width: 600px) {
+      #videoWatermark.watermark-active {
+        display: flex;
+        flex-direction: column;
+        font-size: 20px;
+        white-space: normal;
+        line-height: 1.3;
+      }
+      .wm-desktop-line { display: none; }
+      .wm-mobile-line { display: block; }
+    }
   </style>
 </head>
 <body>
@@ -457,6 +474,8 @@
     // Read from column F, row 1 of the sheet - lets the watermark's trailing tag
     // (e.g. a season/date label) be changed from the sheet without touching code.
     let watermarkTag = "07-2026";
+    // Read from column F, row 2 - used only for the mobile watermark's second line.
+    let watermarkTagMobile = null;
 
     let webAudioContext = null;
     let webAudioSourceNode = null;
@@ -595,17 +614,13 @@
       refVideo.setAttribute('poster', activeThumbnailUrl);
     });
 
-    // The Reference Video box doesn't actually show the poster/thumbnail once
-    // playback has loaded - it shows a real decoded frame, paused at
-    // PRE_RECORD_ALIGN_TIME. The static thumbnail.jpg is a different moment in
-    // the clip (usually near the very start), so using it for the camera overlay
-    // guide made the two look mismatched. This captures the exact frame the
-    // reference video is actually paused on and uses that for the overlay instead,
-    // so they're always identical - and it stays correct automatically even if
-    // PRE_RECORD_ALIGN_TIME or the per-user video changes later.
+    const OVERLAY_FALLBACK_CAPTURE_TIME = 15;
+
+    // Captures whatever frame refVideo is currently paused/showing and uses it
+    // as the camera overlay's background image.
     function captureRefFrameForOverlay() {
       try {
-        if (!refVideo.videoWidth || !refVideo.videoHeight) return;
+        if (!refVideo.videoWidth || !refVideo.videoHeight) return false;
         const canvas = document.createElement('canvas');
         canvas.width = refVideo.videoWidth;
         canvas.height = refVideo.videoHeight;
@@ -613,22 +628,59 @@
         ctx.drawImage(refVideo, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
         cameraOverlay.style.backgroundImage = `url('${dataUrl}')`;
+        return true;
       } catch (e) {
-        // Likely a CORS-tainted canvas (source not serving proper CORS headers) -
-        // silently keep whatever background image is already set (the thumbnail
-        // fallback applied at unlock) rather than breaking anything.
-        console.warn('Overlay frame capture failed, keeping thumbnail fallback:', e);
+        // Likely a CORS-tainted canvas (source not serving proper CORS headers).
+        console.warn('Overlay frame capture failed:', e);
+        return false;
       }
     }
 
-    // Fires every time refVideo finishes seeking. Only capture while idle (not
-    // recording/reviewing/previewing), which is exactly when setupInitialState()
-    // seeks to the alignment frame.
-    refVideo.addEventListener('seeked', () => {
-      if (!isReviewMode && !isRecordingMode && !isPreviewingRef) {
-        captureRefFrameForOverlay();
+    // Seeks to a fixed 15s mark just long enough to grab a frame for the overlay,
+    // then restores whatever position/play-state the reference video was in
+    // beforehand. Only used as a fallback when the thumbnail URL itself fails.
+    function captureFallbackOverlayFrame() {
+      const doCapture = () => {
+        const restoreTime = refVideo.currentTime;
+        const wasPaused = refVideo.paused;
+        const target = Math.min(OVERLAY_FALLBACK_CAPTURE_TIME, (refVideo.duration && isFinite(refVideo.duration)) ? refVideo.duration : OVERLAY_FALLBACK_CAPTURE_TIME);
+
+        const onSeeked = () => {
+          refVideo.removeEventListener('seeked', onSeeked);
+          captureRefFrameForOverlay();
+          refVideo.currentTime = restoreTime;
+          if (!wasPaused) refVideo.play().catch(() => {});
+        };
+        refVideo.addEventListener('seeked', onSeeked);
+        refVideo.currentTime = target;
+      };
+
+      if (refVideo.duration && isFinite(refVideo.duration)) {
+        doCapture();
+      } else {
+        refVideo.addEventListener('loadedmetadata', doCapture, { once: true });
       }
-    });
+    }
+
+    // Camera overlay guide image: prefer the actual thumbnail URL (from the
+    // sheet, or the default) since that's a deliberately chosen image. Only if
+    // that URL fails to load do we fall back to grabbing a real frame from the
+    // reference video at a fixed 15s mark.
+    function applyOverlayThumbnail() {
+      if (!activeThumbnailUrl) {
+        captureFallbackOverlayFrame();
+        return;
+      }
+      const probe = new Image();
+      probe.onload = () => {
+        cameraOverlay.style.backgroundImage = `url('${activeThumbnailUrl}')`;
+      };
+      probe.onerror = () => {
+        console.warn('Thumbnail URL failed to load, falling back to a captured frame at 15s.');
+        captureFallbackOverlayFrame();
+      };
+      probe.src = activeThumbnailUrl;
+    }
 
     // Handles quoted fields (so commas inside a URL's query string, if any,
     // don't get mistaken for column separators) - the naive .split(',') this
@@ -667,6 +719,11 @@
         if (lines.length > 0 && lines[0].trim()) {
           const headerColumns = parseCsvLine(lines[0]);
           if (headerColumns[5]) watermarkTag = headerColumns[5].trim();
+        }
+        // Cell F2 (row 2, column F) drives the mobile-only second watermark line.
+        if (lines.length > 1 && lines[1].trim()) {
+          const row2Columns = parseCsvLine(lines[1]);
+          if (row2Columns[5]) watermarkTagMobile = row2Columns[5].trim();
         }
 
         lines.forEach(line => {
@@ -711,7 +768,7 @@
         // Apply this user's specific reference video's poster/thumbnail everywhere
         // it's used - the video poster and the translucent camera alignment guide.
         refVideo.setAttribute('poster', activeThumbnailUrl);
-        cameraOverlay.style.backgroundImage = `url('${activeThumbnailUrl}')`;
+        applyOverlayThumbnail();
         
         if (Hls.isSupported()) {
           hlsInstance = new Hls({
@@ -805,7 +862,7 @@
       reviewPlayer.classList.remove('active-view');
       viewfinder.classList.add('active-view');
 
-      watermarkEl.style.display = 'none'; signOutBtn.style.display = 'none';
+      watermarkEl.classList.remove('watermark-active'); signOutBtn.style.display = 'none';
       document.getElementById('appContent').style.display = 'none';
       
       reviewPlayer.muted = true; muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
@@ -827,9 +884,27 @@
 
     document.getElementById('gatePass').addEventListener('keypress', function(e) { if (e.key === 'Enter') unlockPortal(); });
 
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function startWatermarkEngine() {
-      watermarkEl.innerText = `${authorizedUser} • ${watermarkTag}`;
-      watermarkEl.style.display = 'block';
+      const safeName = escapeHtml(authorizedUser);
+      const safeTag = escapeHtml(watermarkTag);
+      const safeMobileTag = escapeHtml(watermarkTagMobile || watermarkTag);
+      // Both variants are always rendered; a CSS media query (not JS) decides
+      // which one is actually visible, so it stays correct across resizes/rotation
+      // without needing a resize listener, and desktop styling is untouched.
+      watermarkEl.innerHTML =
+        `<span class="wm-name">${safeName}</span>` +
+        `<span class="wm-desktop-line"> • ${safeTag}</span>` +
+        `<span class="wm-mobile-line">${safeMobileTag}</span>`;
+      watermarkEl.classList.add('watermark-active');
       const moveWatermark = () => {
         const container = refVideo.parentElement;
         const maxX = container.clientWidth - watermarkEl.clientWidth - 24;
