@@ -518,7 +518,7 @@
     let mediaRecorder = null, recordedChunks = [], liveStream = null, isRecordingMode = false, isReviewMode = false, isReviewPlaying = false, isPreviewingRef = false, zoomFadeTimeout = null, isUserScrubbing = false, chosenScale = 1, currentVideoBlob = null, isSeeking = false;
     let reviewPlaybackUrl = null, ffmpegInstance = null, ffmpegLoadPromise = null, isConverting = false, ffmpegProgressHandler = null;
     let overlayActive = true; 
-    const PRE_RECORD_ALIGN_TIME = 1;
+    const PRE_RECORD_ALIGN_TIME = 25;
 
     // --- Countdown tone ---
     // Uses the Web Audio API to synthesize short beeps rather than loading an
