@@ -1200,12 +1200,27 @@
 
     // Builds the list of clips a given user is allowed to pick from: their
     // personal default (columns C-E on the Passcode sheet) plus whatever the
-    // Assigned Clips column grants from the Video Library.
+    // Assigned Clips column grants from the Video Library. Deduplicated by the
+    // actual video URL (not just by ID) - this is what catches all of:
+    //  - a user's own default clip also being listed by ID in their Assigned
+    //    Clips column
+    //  - the same Clip ID typed twice in one Assigned Clips cell
+    //  - two different Clip IDs in the Video Library that point at the same URL
+    // Whichever occurrence comes first wins, so "Your Default" always takes
+    // priority over a duplicate assigned entry.
     function buildClipCards(userRecord) {
       const cards = [];
+      const seenUrls = new Set();
+
+      const addCard = (card) => {
+        const normalizedUrl = (card.hlsUrl || '').trim().toLowerCase();
+        if (!normalizedUrl || seenUrls.has(normalizedUrl)) return;
+        seenUrls.add(normalizedUrl);
+        cards.push(card);
+      };
 
       if (userRecord.hlsUrl) {
-        cards.push({
+        addCard({
           id: '__default__',
           name: 'My Practice Video',
           hlsUrl: userRecord.hlsUrl,
@@ -1219,7 +1234,7 @@
       clipIds.forEach(id => {
         const clip = clipLibrary[id];
         if (!clip) return; // assigned an ID that doesn't exist in the library - skip quietly
-        cards.push({
+        addCard({
           id,
           name: clip.name,
           hlsUrl: clip.hlsUrl,
@@ -1231,6 +1246,7 @@
 
       return cards;
     }
+
 
     function showVideoHub(userRecord) {
       const cards = buildClipCards(userRecord);
