@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kapa Sync Video Review (V30.3-Demon's Blade)</title>
+  <title>Kapa Sync Video Review (V30.4-Demon's Blade)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -126,6 +126,34 @@
     #signOutBtn:hover {
       background-color: rgba(0, 0, 0, 0.35);
       padding-left: 14px;
+    }
+
+    #changeClipBtn {
+      position: fixed;
+      right: 0;
+      top: 58%;
+      transform: translateY(-50%);
+      z-index: 999;
+      background-color: rgba(0, 0, 0, 0.15);
+      color: #007aff;
+      border: 1px solid rgba(0, 122, 255, 0.25);
+      border-right: none;
+      border-radius: 8px 0 0 8px;
+      padding: 14px 10px;
+      font-family: 'Marcellus', serif;
+      font-weight: bold;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      writing-mode: vertical-lr;
+      transform-origin: right center;
+      transition: background-color 0.2s ease, padding-right 0.2s ease;
+      display: none;
+    }
+    #changeClipBtn:hover {
+      background-color: rgba(0, 0, 0, 0.35);
+      padding-right: 14px;
     }
 
     #appContent {
@@ -398,6 +426,103 @@
       .wm-desktop-line { display: none; }
       .wm-mobile-line { display: block; }
     }
+    /* --- VIDEO HUB --- */
+    #videoHubScreen {
+      position: fixed;
+      inset: 0;
+      background: #111;
+      z-index: 9998;
+      display: none;
+      flex-direction: column;
+      padding: env(safe-area-inset-top, 16px) 16px calc(env(safe-area-inset-bottom, 0px) + 16px) 16px;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
+    #videoHubScreen.show { display: flex; }
+
+    .hub-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      flex-shrink: 0;
+    }
+    .hub-title {
+      font-family: 'Marcellus', serif;
+      color: white;
+      font-size: 20px;
+      margin: 0;
+      letter-spacing: 0.5px;
+    }
+    .hub-signout-btn {
+      font-family: 'Marcellus', serif;
+      font-size: 11px;
+      font-weight: bold;
+      color: #ff453a;
+      background: transparent;
+      border: 1px solid rgba(255, 69, 58, 0.3);
+      border-radius: 6px;
+      padding: 8px 12px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .hub-signout-btn:hover { background: rgba(255, 69, 58, 0.1); }
+
+    .hub-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+      flex-grow: 1;
+      align-content: start;
+    }
+
+    .hub-card {
+      background: #1c1c1e;
+      border: 1px solid #2c2c2e;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.1s ease, border-color 0.15s ease;
+    }
+    .hub-card:active { transform: scale(0.96); }
+    .hub-card:hover { border-color: #007aff; }
+    .hub-card.hub-card-default { border-color: #5856d6; }
+
+    .hub-card-thumb {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background-size: cover;
+      background-position: center;
+      background-color: #000;
+    }
+    .hub-card-name {
+      font-family: 'Marcellus', serif;
+      color: white;
+      font-size: 12px;
+      font-weight: bold;
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .hub-card-badge {
+      font-family: 'Marcellus', serif;
+      font-size: 9px;
+      color: #5856d6;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 0 10px 6px 10px;
+      text-align: center;
+    }
+
+    .hub-empty-message {
+      color: #8e8e93;
+      font-family: 'Marcellus', serif;
+      font-size: 13px;
+      text-align: center;
+      padding: 40px 20px;
+      grid-column: 1 / -1;
+    }
   </style>
 </head>
 <body>
@@ -410,11 +535,22 @@
       <input type="password" id="gatePass" class="gate-input" placeholder="••••••••" autofocus>
       <button onclick="unlockPortal()" class="gate-btn">Tahuna Te Ahi</button>
       <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
-      <div class="gate-build-tag">v30.3 - Demon's Blade Build</div>
+      <div class="gate-build-tag">v30.4 - Demon's Blade Build</div>
     </div>
   </div>
 
   <button id="signOutBtn" onclick="handleSignOut()">Sign Out</button>
+
+  <!-- VIDEO HUB SCREEN -->
+  <div id="videoHubScreen">
+    <div class="hub-topbar">
+      <h2 class="hub-title">Choose a Clip</h2>
+      <button id="hubSignOutBtn" class="hub-signout-btn">Sign Out</button>
+    </div>
+    <div class="hub-grid" id="hubGrid"></div>
+  </div>
+
+  <button id="changeClipBtn" onclick="returnToVideoHub()">Change Clip</button>
 
   <!-- MAIN APP CONTAINER -->
   <div id="appContent">
@@ -487,12 +623,16 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V30.3</div>
+      <div class="version-tag">V30.4</div>
     </div>
   </div>
 
   <script>
     const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1fxQrloklFsVMvy1-hf5kouhH1w0N_gaPy26uA5jT7S8/gviz/tq?tqx=out:csv";
+    // "Video Library" tab - the shared catalog of practice clips users can pick from.
+    const VIDEO_LIBRARY_CSV_URL = "https://docs.google.com/spreadsheets/d/1fxQrloklFsVMvy1-hf5kouhH1w0N_gaPy26uA5jT7S8/gviz/tq?tqx=out:csv&gid=1223354905";
+    // Keyed by lowercased Clip ID -> { name, hlsUrl, thumbnailUrl, thumbnailTime }
+    let clipLibrary = {};
     // Fallback video shown if a user's sheet row leaves the HLS/Thumbnail columns blank.
     const DEFAULT_HLS_URL = "https://vz-1e14ed9f-aa1.b-cdn.net/ed64b70f-c2ab-4fd9-acde-98b43fa4868e/playlist.m3u8";
     const DEFAULT_THUMBNAIL_URL = "https://vz-1e14ed9f-aa1.b-cdn.net/ed64b70f-c2ab-4fd9-acde-98b43fa4868e/thumbnail.jpg";
@@ -505,6 +645,7 @@
     
     let userDatabase = {}; 
     let authorizedUser = "";
+    let currentPasscode = "";
     let watermarkTimer = null;
     let hlsInstance = null;
     // Read from column G, row 1 of the sheet - lets the watermark's trailing tag
@@ -521,6 +662,10 @@
     const gateError = document.getElementById('gateError');
     const watermarkEl = document.getElementById('videoWatermark');
     const signOutBtn = document.getElementById('signOutBtn');
+    const changeClipBtn = document.getElementById('changeClipBtn');
+    const videoHubScreen = document.getElementById('videoHubScreen');
+    const hubGrid = document.getElementById('hubGrid');
+    const hubSignOutBtn = document.getElementById('hubSignOutBtn');
 
     const viewfinder = document.getElementById('viewfinder');
     const reviewPlayer = document.getElementById('reviewPlayer');
@@ -900,15 +1045,15 @@
         const csvText = await response.text();
         const lines = csvText.split(/\r?\n/);
 
-        // Cell G1 (row 1, column G / index 6) drives the watermark's trailing tag.
+        // Cell H1 (row 1, column H / index 7) drives the watermark's trailing tag.
         if (lines.length > 0 && lines[0].trim()) {
           const headerColumns = parseCsvLine(lines[0]);
-          if (headerColumns[6]) watermarkTag = headerColumns[6].trim();
+          if (headerColumns[7]) watermarkTag = headerColumns[7].trim();
         }
-        // Cell G2 (row 2, column G) drives the mobile-only second watermark line.
+        // Cell H2 (row 2, column H) drives the mobile-only second watermark line.
         if (lines.length > 1 && lines[1].trim()) {
           const row2Columns = parseCsvLine(lines[1]);
-          if (row2Columns[6]) watermarkTagMobile = row2Columns[6].trim();
+          if (row2Columns[7]) watermarkTagMobile = row2Columns[7].trim();
         }
 
         lines.forEach(line => {
@@ -922,6 +1067,14 @@
           const thumbnailTime = thumbnailTimeRaw !== '' && !isNaN(parseFloat(thumbnailTimeRaw)) && parseFloat(thumbnailTimeRaw) >= 0
             ? parseFloat(thumbnailTimeRaw)
             : null;
+          // Column F: comma-separated Clip IDs from the Video Library tab, or the
+          // keyword ALL to grant every clip in the library. Blank = no hub access
+          // beyond their own default clip (columns C-E above).
+          const assignedClipsRaw = (columns[5] || '').trim();
+          const assignedClipsAll = assignedClipsRaw.toUpperCase() === 'ALL';
+          const assignedClips = assignedClipsAll
+            ? []
+            : assignedClipsRaw.split(',').map(id => id.trim().toLowerCase()).filter(id => id !== '');
 
           if (!passcode || !name) return;
           if (passcode === 'passcode' || passcode === 'passcodes') return; // skip a header row if present
@@ -932,7 +1085,9 @@
             name,
             hlsUrl: hlsUrl || null,
             thumbnailUrl: thumbnailUrl || null,
-            thumbnailTime
+            thumbnailTime,
+            assignedClipsAll,
+            assignedClips
           };
         });
         if (gateError) { gateError.style.display = 'none'; gateError.innerText = "Incorrect passcode. Please try again."; }
@@ -940,7 +1095,223 @@
         if (gateError) { gateError.style.display = 'block'; gateError.innerText = "Security database offline."; }
       }
     }
+    async function fetchVideoLibrary() {
+      try {
+        const response = await fetch(VIDEO_LIBRARY_CSV_URL);
+        if (!response.ok) throw new Error("Video library sync failed");
+        const csvText = await response.text();
+        const lines = csvText.split(/\r?\n/);
+
+        lines.forEach(line => {
+          if (!line.trim()) return;
+          const columns = parseCsvLine(line);
+          const clipId = (columns[0] || '').trim().toLowerCase();
+          const clipName = (columns[1] || '').trim();
+          const hlsUrl = (columns[2] || '').trim();
+          const thumbnailUrl = (columns[3] || '').trim();
+          const thumbnailTimeRaw = (columns[4] || '').trim();
+          const thumbnailTime = thumbnailTimeRaw !== '' && !isNaN(parseFloat(thumbnailTimeRaw)) && parseFloat(thumbnailTimeRaw) >= 0
+            ? parseFloat(thumbnailTimeRaw)
+            : null;
+
+          if (!clipId || !clipName || !hlsUrl) return;
+          if (clipId === 'clip id' || clipId === 'clip_id' || clipId === 'clipid') return; // skip a header row if present
+
+          clipLibrary[clipId] = {
+            name: clipName,
+            hlsUrl,
+            thumbnailUrl: thumbnailUrl || null,
+            thumbnailTime
+          };
+        });
+      } catch (err) {
+        console.warn('Video library fetch failed:', err);
+      }
+    }
+
     fetchAccessDatabase();
+    fetchVideoLibrary();
+
+    // Sets up (or re-points) the HLS player against whatever activeHlsUrl currently
+    // is. Destroys any prior instance first, since this now runs every time the
+    // user picks a different clip from the hub, not just once at login.
+    function initializeReferenceVideoPlayback() {
+      if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+
+      if (Hls.isSupported()) {
+        hlsInstance = new Hls({
+          enableWorker: true,
+          lowLatencyMode: false,   // this is a fixed VOD lesson clip, not a live stream -
+                                    // low-latency mode adds segment-timing overhead with no
+                                    // benefit here and can itself introduce buffering hiccups
+          maxBufferLength: 30,
+          maxMaxBufferLength: 90,  // trimmed from 600s - holding ~10 minutes of buffer was
+                                    // memory-heavy on mobile and could cause GC-driven stutter
+          backBufferLength: 60,    // still generous enough to avoid refetching on backward
+                                    // seeks/loops, without the earlier extreme retention
+          capLevelToPlayerSize: true, // don't fetch a higher-res rendition than the small
+                                       // preview box actually needs
+          appendErrorMaxRetry: 5,
+          maxFragLookUpTolerance: 0.2
+        });
+
+        // The reference clip plays small and fixed-size, so lock to a single
+        // rendition instead of letting ABR switch quality mid-playback. A
+        // quality switch means swapping renditions mid-stream, which is exactly
+        // what shows up as a "random" glitch/freeze that isn't tied to anything
+        // the user did.
+        hlsInstance.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+          if (data.levels && data.levels.length > 1) {
+            let bestIndex = 0;
+            let bestHeight = Infinity;
+            data.levels.forEach((level, index) => {
+              if (level.height && level.height < bestHeight && level.height >= 240) {
+                bestHeight = level.height;
+                bestIndex = index;
+              }
+            });
+            hlsInstance.currentLevel = bestIndex;
+          }
+        });
+
+        // Auto-recover from stalls/errors instead of leaving playback stuck.
+        hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+          if (!data.fatal) return;
+          console.warn('HLS fatal error:', data.type, data.details);
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              hlsInstance.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              hlsInstance.recoverMediaError();
+              break;
+            default:
+              hlsInstance.destroy();
+              break;
+          }
+        });
+
+        hlsInstance.loadSource(activeHlsUrl);
+        hlsInstance.attachMedia(refVideo);
+      } else if (refVideo.canPlayType('application/vnd.apple.mpegurl')) {
+        refVideo.src = activeHlsUrl;
+      }
+    }
+
+    // Builds the list of clips a given user is allowed to pick from: their
+    // personal default (columns C-E on the Passcode sheet) plus whatever the
+    // Assigned Clips column grants from the Video Library.
+    function buildClipCards(userRecord) {
+      const cards = [];
+
+      if (userRecord.hlsUrl) {
+        cards.push({
+          id: '__default__',
+          name: 'My Practice Video',
+          hlsUrl: userRecord.hlsUrl,
+          thumbnailUrl: userRecord.thumbnailUrl || DEFAULT_THUMBNAIL_URL,
+          thumbnailTime: (userRecord.thumbnailTime !== null && userRecord.thumbnailTime !== undefined) ? userRecord.thumbnailTime : DEFAULT_ALIGN_TIME,
+          isDefault: true
+        });
+      }
+
+      const clipIds = userRecord.assignedClipsAll ? Object.keys(clipLibrary) : userRecord.assignedClips;
+      clipIds.forEach(id => {
+        const clip = clipLibrary[id];
+        if (!clip) return; // assigned an ID that doesn't exist in the library - skip quietly
+        cards.push({
+          id,
+          name: clip.name,
+          hlsUrl: clip.hlsUrl,
+          thumbnailUrl: clip.thumbnailUrl || DEFAULT_THUMBNAIL_URL,
+          thumbnailTime: (clip.thumbnailTime !== null && clip.thumbnailTime !== undefined) ? clip.thumbnailTime : DEFAULT_ALIGN_TIME,
+          isDefault: false
+        });
+      });
+
+      return cards;
+    }
+
+    function showVideoHub(userRecord) {
+      const cards = buildClipCards(userRecord);
+      hubGrid.innerHTML = '';
+
+      if (cards.length === 0) {
+        const msg = document.createElement('div');
+        msg.className = 'hub-empty-message';
+        msg.textContent = 'No clips have been assigned to your account yet.';
+        hubGrid.appendChild(msg);
+      } else {
+        cards.forEach(clip => {
+          const card = document.createElement('div');
+          card.className = 'hub-card' + (clip.isDefault ? ' hub-card-default' : '');
+
+          const thumb = document.createElement('div');
+          thumb.className = 'hub-card-thumb';
+          thumb.style.backgroundImage = `url('${clip.thumbnailUrl}')`;
+          card.appendChild(thumb);
+
+          const name = document.createElement('div');
+          name.className = 'hub-card-name';
+          name.textContent = clip.name;
+          card.appendChild(name);
+
+          if (clip.isDefault) {
+            const badge = document.createElement('div');
+            badge.className = 'hub-card-badge';
+            badge.textContent = 'Your Default';
+            card.appendChild(badge);
+          }
+
+          card.addEventListener('click', () => selectClipAndEnterApp(clip));
+          hubGrid.appendChild(card);
+        });
+      }
+
+      videoHubScreen.classList.add('show');
+    }
+
+    function selectClipAndEnterApp(clip) {
+      activeHlsUrl = clip.hlsUrl;
+      activeThumbnailUrl = clip.thumbnailUrl;
+      activeAlignTime = clip.thumbnailTime;
+
+      videoHubScreen.classList.remove('show');
+      document.getElementById('appContent').style.display = 'flex';
+      changeClipBtn.style.display = 'block';
+
+      // Apply this clip's poster/thumbnail everywhere it's used - the video
+      // poster and the translucent camera alignment guide.
+      refVideo.setAttribute('poster', activeThumbnailUrl);
+      applyOverlayThumbnail();
+      initializeReferenceVideoPlayback();
+      startWatermarkEngine();
+
+      if (!liveStream) {
+        // First time entering the camera app this session - request camera access.
+        initCamera();
+      } else {
+        // Camera's already granted from a previous clip this session - no need
+        // to re-request it, just refresh the idle display for the new video.
+        setupInitialState();
+      }
+    }
+
+    function returnToVideoHub() {
+      resetRecordingReviewState();
+      if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+      refVideo.pause();
+      refVideo.removeAttribute('src');
+      refVideo.load();
+      cameraOverlay.style.backgroundImage = '';
+
+      document.getElementById('appContent').style.display = 'none';
+      changeClipBtn.style.display = 'none';
+
+      showVideoHub(userDatabase[currentPasscode] || { hlsUrl: null, assignedClips: [], assignedClipsAll: false });
+    }
+
+    hubSignOutBtn.addEventListener('click', handleSignOut);
 
     function unlockPortal() {
       const passInput = document.getElementById('gatePass');
@@ -948,103 +1319,33 @@
       const userRecord = userDatabase[input];
       if (userRecord) {
         authorizedUser = userRecord.name;
-        activeHlsUrl = userRecord.hlsUrl || DEFAULT_HLS_URL;
-        activeThumbnailUrl = userRecord.thumbnailUrl || DEFAULT_THUMBNAIL_URL;
-        activeAlignTime = (userRecord.thumbnailTime !== null && userRecord.thumbnailTime !== undefined) ? userRecord.thumbnailTime : DEFAULT_ALIGN_TIME;
+        currentPasscode = input;
 
         document.getElementById('passwordGate').style.display = 'none';
-        document.getElementById('appContent').style.display = 'flex';
         signOutBtn.style.display = 'block';
 
-        // Apply this user's specific reference video's poster/thumbnail everywhere
-        // it's used - the video poster and the translucent camera alignment guide.
-        refVideo.setAttribute('poster', activeThumbnailUrl);
-        applyOverlayThumbnail();
-        
-        if (Hls.isSupported()) {
-          hlsInstance = new Hls({
-            enableWorker: true,
-            lowLatencyMode: false,   // this is a fixed VOD lesson clip, not a live stream -
-                                      // low-latency mode adds segment-timing overhead with no
-                                      // benefit here and can itself introduce buffering hiccups
-            maxBufferLength: 30,
-            maxMaxBufferLength: 90,  // trimmed from 600s - holding ~10 minutes of buffer was
-                                      // memory-heavy on mobile and could cause GC-driven stutter
-            backBufferLength: 60,    // still generous enough to avoid refetching on backward
-                                      // seeks/loops, without the earlier extreme retention
-            capLevelToPlayerSize: true, // don't fetch a higher-res rendition than the small
-                                         // preview box actually needs
-            appendErrorMaxRetry: 5,
-            maxFragLookUpTolerance: 0.2
-          });
-
-          // The reference clip plays small and fixed-size, so lock to a single
-          // rendition instead of letting ABR switch quality mid-playback. A
-          // quality switch means swapping renditions mid-stream, which is exactly
-          // what shows up as a "random" glitch/freeze that isn't tied to anything
-          // the user did.
-          hlsInstance.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-            if (data.levels && data.levels.length > 1) {
-              let bestIndex = 0;
-              let bestHeight = Infinity;
-              data.levels.forEach((level, index) => {
-                if (level.height && level.height < bestHeight && level.height >= 240) {
-                  bestHeight = level.height;
-                  bestIndex = index;
-                }
-              });
-              hlsInstance.currentLevel = bestIndex;
-            }
-          });
-
-          // Auto-recover from stalls/errors instead of leaving playback stuck.
-          hlsInstance.on(Hls.Events.ERROR, (event, data) => {
-            if (!data.fatal) return;
-            console.warn('HLS fatal error:', data.type, data.details);
-            switch (data.type) {
-              case Hls.ErrorTypes.NETWORK_ERROR:
-                hlsInstance.startLoad();
-                break;
-              case Hls.ErrorTypes.MEDIA_ERROR:
-                hlsInstance.recoverMediaError();
-                break;
-              default:
-                hlsInstance.destroy();
-                break;
-            }
-          });
-
-          hlsInstance.loadSource(activeHlsUrl);
-          hlsInstance.attachMedia(refVideo);
-        } else if (refVideo.canPlayType('application/vnd.apple.mpegurl')) {
-          refVideo.src = activeHlsUrl;
-        }
-        startWatermarkEngine();
-        initCamera();
+        showVideoHub(userRecord);
       } else {
         if (gateError) gateError.style.display = 'block';
         if (passInput) passInput.value = '';
       }
     }
 
-    function handleSignOut() {
+    // Everything involved in tearing down an in-progress recording/review/preview
+    // session and returning the camera box to its idle "Start Session" state.
+    // Shared by handleSignOut (which also releases the camera and shows the gate)
+    // and returnToVideoHub (which keeps the camera running and shows the hub).
+    function resetRecordingReviewState() {
       cleanupIsolatedAudioPipeline();
       clearTimeout(zoomFadeTimeout);
       if (watermarkTimer) clearInterval(watermarkTimer);
       if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
-      if (liveStream) liveStream.getTracks().forEach(track => track.stop());
-      if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-      
+
       isRecordingMode = false; isReviewMode = false; isReviewPlaying = false; isPreviewingRef = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1; isSeeking = false; isConverting = false;
       pendingSaveBlob = null; pendingSaveFilename = null;
       loopStartTime = 0; loopEndTime = 0;
-      activeHlsUrl = DEFAULT_HLS_URL; activeThumbnailUrl = DEFAULT_THUMBNAIL_URL; activeAlignTime = DEFAULT_ALIGN_TIME;
-      cameraOverlay.style.backgroundImage = '';
       if (reviewPlaybackUrl) { URL.revokeObjectURL(reviewPlaybackUrl); reviewPlaybackUrl = null; }
-      refVideo.pause(); refVideo.removeAttribute('src'); refVideo.setAttribute('poster', DEFAULT_THUMBNAIL_URL); refVideo.load();
-      
-      viewfinder.pause(); 
-      viewfinder.srcObject = null;
+
       reviewPlayer.pause();
       removeVideoEndedListener();
       reviewPlayer.removeAttribute('src');
@@ -1054,22 +1355,40 @@
       reviewPlayer.classList.remove('active-view');
       viewfinder.classList.add('active-view');
 
-      watermarkEl.classList.remove('watermark-active'); signOutBtn.style.display = 'none';
-      document.getElementById('appContent').style.display = 'none';
-      
+      watermarkEl.classList.remove('watermark-active');
+
       reviewPlayer.muted = true; muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
       masterTimeline.classList.remove('show'); refTimeline.classList.remove('show'); syncOffsetRow.classList.remove('show'); resetSyncOffset(); downloadBtn.style.display = "none";
       downloadBtn.disabled = false; downloadBtn.innerText = "Save"; downloadBtn.classList.remove('save-pending', 'save-error');
       zoomSlider.value = 1; zoomLabel.innerText = "1.0x"; viewfinder.style.transform = "scale(1)";
       zoomUi.style.display = "flex"; recBadge.style.display = "none"; streamLabel.classList.remove('review-active');
       streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
-      
+
       previewRefBtn.classList.remove('hidden'); previewRefBtn.innerText = "Preview Ref"; previewRefBtn.className = "custom-png-btn";
       overlayToggleBtn.classList.remove('hidden'); opacitySelector.classList.remove('hidden');
       overlayToggleBtn.disabled = false; opacitySelector.disabled = false; overlayActive = true;
-      cameraOverlay.classList.remove('hidden'); 
+      cameraOverlay.classList.remove('hidden');
       actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
       resetBtn.innerText = "Reset / Clear"; resetBtn.disabled = true; resetBtn.style.display = "none"; resetBtn.classList.remove('danger-active');
+    }
+
+    function handleSignOut() {
+      resetRecordingReviewState();
+      if (liveStream) liveStream.getTracks().forEach(track => track.stop());
+      if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+
+      activeHlsUrl = DEFAULT_HLS_URL; activeThumbnailUrl = DEFAULT_THUMBNAIL_URL; activeAlignTime = DEFAULT_ALIGN_TIME;
+      cameraOverlay.style.backgroundImage = '';
+      refVideo.pause(); refVideo.removeAttribute('src'); refVideo.setAttribute('poster', DEFAULT_THUMBNAIL_URL); refVideo.load();
+
+      viewfinder.pause();
+      viewfinder.srcObject = null;
+
+      signOutBtn.style.display = 'none';
+      changeClipBtn.style.display = 'none';
+      document.getElementById('appContent').style.display = 'none';
+      videoHubScreen.classList.remove('show');
+
       const passInput = document.getElementById('gatePass'); if (passInput) passInput.value = '';
       document.getElementById('passwordGate').style.display = 'flex';
     }
