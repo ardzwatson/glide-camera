@@ -1103,7 +1103,9 @@
         const csvText = await response.text();
         const lines = csvText.split(/\r?\n/);
 
+        let rowNum = 0;
         lines.forEach(line => {
+          rowNum++;
           if (!line.trim()) return;
           const columns = parseCsvLine(line);
           const clipId = (columns[0] || '').trim().toLowerCase();
@@ -1115,8 +1117,22 @@
             ? parseFloat(thumbnailTimeRaw)
             : null;
 
-          if (!clipId || !clipName || !hlsUrl) return;
           if (clipId === 'clip id' || clipId === 'clip_id' || clipId === 'clipid') return; // skip a header row if present
+
+          if (!clipId || !clipName || !hlsUrl) {
+            console.warn(
+              `Video Library row ${rowNum} skipped - missing required field(s). ` +
+              `Clip ID="${clipId}" Clip Name="${clipName}" HLS URL="${hlsUrl}". ` +
+              `Expected column order: Clip ID / Clip Name / HLS URL / Thumbnail URL / Thumbnail Time.`
+            );
+            return;
+          }
+          if (!hlsUrl.includes('.m3u8')) {
+            // Doesn't look like a real HLS playlist URL - very often caused by
+            // columns being one or two cells off (e.g. a Thumbnail Time value
+            // ending up in the HLS URL cell). Still loads it, just flags it.
+            console.warn(`Video Library row ${rowNum} ("${clipId}"): HLS URL doesn't look like a .m3u8 link - "${hlsUrl}". Check this row's column alignment.`);
+          }
 
           clipLibrary[clipId] = {
             name: clipName,
@@ -1125,6 +1141,7 @@
             thumbnailTime
           };
         });
+        console.info(`Video Library loaded: ${Object.keys(clipLibrary).length} clip(s) - [${Object.keys(clipLibrary).join(', ')}]`);
       } catch (err) {
         console.warn('Video library fetch failed:', err);
       }
