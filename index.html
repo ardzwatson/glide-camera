@@ -146,6 +146,9 @@
       .zoom-container { bottom: 6px !important; padding: 4px 8px !important; }
       .timeline-footer { height: 28px !important; margin-top: 4px !important; gap: 8px !important; }
       .sync-offset-row { height: 28px !important; margin-top: 4px !important; gap: 6px !important; }
+      .ref-loop-row { padding: 6px 10px !important; margin-bottom: 4px !important; gap: 6px !important; }
+      .ref-loop-handle { width: 14px !important; height: 14px !important; margin-left: -7px !important; }
+      .ref-loop-reset-btn { font-size: 9px !important; padding: 5px 8px !important; }
       .sync-offset-label { display: none; }
       .offset-btn { width: 26px !important; height: 22px !important; font-size: 13px !important; }
       .offset-value { font-size: 11px !important; min-width: 42px !important; padding: 3px !important; }
@@ -224,6 +227,24 @@
     .ref-timeline-slider { flex-grow: 1; -webkit-appearance: none; appearance: none; height: 6px; background: #333; border-radius: 3px; outline: none; }
     .ref-timeline-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #28a745; cursor: pointer; border: 2px solid white; }
     .ref-time-display { font-family: 'Marcellus', serif; font-size: 12px; color: #aaa; min-width: 35px; text-align: right; }
+
+    .ref-loop-row { width: 100%; display: none; align-items: center; gap: 10px; background: rgba(0,0,0,0.4); padding: 12px; box-sizing: border-box; border-radius: 8px; margin-bottom: 8px; flex-shrink: 0; }
+    .ref-loop-row.show { display: flex; }
+    .ref-loop-track { position: relative; flex-grow: 1; height: 6px; background: #333; border-radius: 3px; }
+    .ref-loop-range-fill { position: absolute; top: 0; bottom: 0; left: 0%; right: 100%; background: #28a745; border-radius: 3px; pointer-events: none; }
+    .ref-loop-handle {
+      position: absolute; top: 50%; left: 0%; width: 18px; height: 18px; margin-left: -9px;
+      transform: translateY(-50%); background: #28a745; border: 2px solid white; border-radius: 50%;
+      cursor: grab; touch-action: none; box-shadow: 0 1px 4px rgba(0,0,0,0.5); z-index: 2;
+    }
+    .ref-loop-handle:active { cursor: grabbing; transform: translateY(-50%) scale(1.15); }
+    .ref-loop-reset-btn {
+      font-family: 'Marcellus', serif; font-size: 10px; font-weight: bold; color: #aaa; background: transparent;
+      border: 1px solid #48484a; border-radius: 6px; padding: 8px 10px; cursor: pointer; white-space: nowrap;
+      transition: color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease; flex-shrink: 0;
+    }
+    .ref-loop-reset-btn:hover:not(:disabled) { color: white; border-color: #777; }
+    .ref-loop-reset-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     
     .mute-btn-container { display: flex; align-items: center; justify-content: center; }
     .mute-btn { font-family: 'Marcellus', serif; border: none; width: 90px; height: 32px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.6); background: linear-gradient(135deg, #5c5c5e, #2c2c2e); border-radius: 6px; opacity: 0.9; transition: opacity 0.2s ease; }
@@ -424,6 +445,15 @@
       <input type="range" id="refScrubSlider" class="ref-timeline-slider" min="0" max="100" step="0.1" value="0">
       <div class="ref-time-display" id="refTimeLabel">0:00</div>
     </div>
+
+    <div class="ref-loop-row" id="refLoopRow">
+      <div class="ref-loop-track" id="refLoopTrack">
+        <div class="ref-loop-range-fill" id="refLoopRangeFill"></div>
+        <div class="ref-loop-handle" id="refLoopStartHandle"></div>
+        <div class="ref-loop-handle" id="refLoopEndHandle"></div>
+      </div>
+      <button type="button" class="ref-loop-reset-btn" id="refLoopResetBtn" disabled>Reset Loop</button>
+    </div>
     
     <div class="timeline-footer" id="masterTimeline">
       <input type="range" id="scrubSlider" class="timeline-slider" min="0" max="100" step="0.1" value="0">
@@ -515,6 +545,12 @@
     const refTimeline = document.getElementById('refTimeline');
     const refScrubSlider = document.getElementById('refScrubSlider');
     const refTimeLabel = document.getElementById('refTimeLabel');
+    const refLoopRow = document.getElementById('refLoopRow');
+    const refLoopTrack = document.getElementById('refLoopTrack');
+    const refLoopRangeFill = document.getElementById('refLoopRangeFill');
+    const refLoopStartHandle = document.getElementById('refLoopStartHandle');
+    const refLoopEndHandle = document.getElementById('refLoopEndHandle');
+    const refLoopResetBtn = document.getElementById('refLoopResetBtn');
     const syncOffsetRow = document.getElementById('syncOffsetRow');
     const offsetMinusBtn = document.getElementById('offsetMinusBtn');
     const offsetPlusBtn = document.getElementById('offsetPlusBtn');
@@ -603,6 +639,92 @@
 
     offsetMinusBtn.addEventListener('click', () => adjustSyncOffset(-SYNC_OFFSET_STEP));
     offsetPlusBtn.addEventListener('click', () => adjustSyncOffset(SYNC_OFFSET_STEP));
+
+    // --- Preview Ref loop range ---
+    // Two draggable markers let the user narrow playback to a specific section
+    // of the reference video and have it repeat, while previewing. Left alone,
+    // the markers stay at the full 0..duration range, which is treated as "no
+    // loop" - Preview Ref just plays straight through as before.
+    let loopStartTime = 0;
+    let loopEndTime = 0; // becomes refVideo.duration once known
+    const MIN_LOOP_GAP_SECONDS = 0.5;
+
+    function getRefDuration() {
+      return (refVideo.duration && isFinite(refVideo.duration) && refVideo.duration > 0) ? refVideo.duration : null;
+    }
+
+    // True only once the user has actually dragged a handle in from either end.
+    function isLoopRangeNarrowed() {
+      const duration = getRefDuration();
+      if (!duration) return false;
+      return loopStartTime > 0.05 || loopEndTime < (duration - 0.05);
+    }
+
+    function resetLoopRange() {
+      const duration = getRefDuration();
+      loopStartTime = 0;
+      loopEndTime = duration || 0;
+      updateLoopUi();
+    }
+
+    function updateLoopUi() {
+      const duration = getRefDuration();
+      if (!duration) return;
+      const startPct = (loopStartTime / duration) * 100;
+      const endPct = (loopEndTime / duration) * 100;
+      refLoopStartHandle.style.left = `${startPct}%`;
+      refLoopEndHandle.style.left = `${endPct}%`;
+      refLoopRangeFill.style.left = `${startPct}%`;
+      refLoopRangeFill.style.right = `${100 - endPct}%`;
+      refLoopResetBtn.disabled = !isLoopRangeNarrowed();
+    }
+
+    function setupLoopHandleDrag(handleEl, which) {
+      handleEl.addEventListener('pointerdown', (downEvent) => {
+        const duration = getRefDuration();
+        if (!duration) return;
+        downEvent.preventDefault();
+        handleEl.setPointerCapture(downEvent.pointerId);
+
+        const onMove = (moveEvent) => {
+          const rect = refLoopTrack.getBoundingClientRect();
+          let fraction = rect.width > 0 ? (moveEvent.clientX - rect.left) / rect.width : 0;
+          fraction = Math.max(0, Math.min(1, fraction));
+          let time = fraction * duration;
+
+          if (which === 'start') {
+            loopStartTime = Math.max(0, Math.min(time, loopEndTime - MIN_LOOP_GAP_SECONDS));
+          } else {
+            loopEndTime = Math.min(duration, Math.max(time, loopStartTime + MIN_LOOP_GAP_SECONDS));
+          }
+          updateLoopUi();
+
+          // Keep whatever's currently shown inside the new range, so the loop
+          // is immediately visible instead of needing a separate manual seek.
+          if (refVideo.currentTime < loopStartTime || refVideo.currentTime > loopEndTime) {
+            refVideo.currentTime = loopStartTime;
+          }
+        };
+        const onUp = (upEvent) => {
+          handleEl.releasePointerCapture(upEvent.pointerId);
+          handleEl.removeEventListener('pointermove', onMove);
+          handleEl.removeEventListener('pointerup', onUp);
+          handleEl.removeEventListener('pointercancel', onUp);
+        };
+        handleEl.addEventListener('pointermove', onMove);
+        handleEl.addEventListener('pointerup', onUp);
+        handleEl.addEventListener('pointercancel', onUp);
+      });
+    }
+    setupLoopHandleDrag(refLoopStartHandle, 'start');
+    setupLoopHandleDrag(refLoopEndHandle, 'end');
+
+    refLoopResetBtn.addEventListener('click', () => {
+      resetLoopRange();
+      if (isPreviewingRef && (refVideo.currentTime < loopStartTime || refVideo.currentTime > loopEndTime)) {
+        refVideo.currentTime = loopStartTime;
+      }
+    });
 
     // --- Save/Share state ---
     // A blob+filename that is ready to be written to disk/shared, waiting on a fresh
@@ -870,6 +992,7 @@
       
       isRecordingMode = false; isReviewMode = false; isReviewPlaying = false; isPreviewingRef = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1; isSeeking = false; isConverting = false;
       pendingSaveBlob = null; pendingSaveFilename = null;
+      loopStartTime = 0; loopEndTime = 0;
       activeHlsUrl = DEFAULT_HLS_URL; activeThumbnailUrl = DEFAULT_THUMBNAIL_URL; activeAlignTime = DEFAULT_ALIGN_TIME;
       cameraOverlay.style.backgroundImage = '';
       if (reviewPlaybackUrl) { URL.revokeObjectURL(reviewPlaybackUrl); reviewPlaybackUrl = null; }
@@ -890,7 +1013,7 @@
       document.getElementById('appContent').style.display = 'none';
       
       reviewPlayer.muted = true; muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
-      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show'); syncOffsetRow.classList.remove('show'); resetSyncOffset(); downloadBtn.style.display = "none";
+      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show'); syncOffsetRow.classList.remove('show'); refLoopRow.classList.remove('show'); resetSyncOffset(); downloadBtn.style.display = "none";
       downloadBtn.disabled = false; downloadBtn.innerText = "Save"; downloadBtn.classList.remove('save-pending', 'save-error');
       zoomSlider.value = 1; zoomLabel.innerText = "1.0x"; viewfinder.style.transform = "scale(1)";
       zoomUi.style.display = "flex"; recBadge.style.display = "none"; streamLabel.classList.remove('review-active');
@@ -963,6 +1086,7 @@
         opacitySelector.classList.remove('hidden');
         masterTimeline.classList.remove('show');
         refTimeline.classList.remove('show');
+        refLoopRow.classList.remove('show');
         previewRefBtn.classList.remove('hidden');
       }
     }
@@ -1001,15 +1125,18 @@
         previewRefBtn.innerText = "Pause Preview";
         previewRefBtn.classList.add('previewing');
         refLabel.innerHTML = `<span>REFERENCE LESSON (PREVIEWING)</span>`;
-        refVideo.currentTime = 0;
 
-        // Show reference timeline
+        // Show reference timeline + loop range controls
         if (refVideo.duration && isFinite(refVideo.duration) && refVideo.duration > 0) {
           refScrubSlider.max = refVideo.duration;
-          refScrubSlider.value = 0;
-          updateRefTimeDisplay(0);
+          resetLoopRange(); // fresh preview session always starts unlooped (full video)
           refTimeline.classList.add('show');
+          refLoopRow.classList.add('show');
         }
+
+        refVideo.currentTime = loopStartTime;
+        refScrubSlider.value = loopStartTime;
+        updateRefTimeDisplay(loopStartTime);
 
         refVideo.play().catch(() => {});
       } else if (!refVideo.paused) {
@@ -1098,7 +1225,7 @@
         cameraOverlay.classList.add('hidden');
       }
       
-      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show'); syncOffsetRow.classList.remove('show');
+      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show'); syncOffsetRow.classList.remove('show'); refLoopRow.classList.remove('show');
 
       refVideo.addEventListener('ended', handleVideoTrackFinished);
 
@@ -1488,6 +1615,11 @@
           refScrubSlider.value = refVideo.currentTime;
           updateRefTimeDisplay(refVideo.currentTime);
         }
+        // Only loop if the user has actually narrowed the range - default
+        // behavior is still to just play straight through to the natural end.
+        if (isLoopRangeNarrowed() && refVideo.currentTime >= loopEndTime - 0.05) {
+          refVideo.currentTime = loopStartTime;
+        }
       }
     });
 
@@ -1495,6 +1627,8 @@
       if (isPreviewingRef && refVideo.duration && isFinite(refVideo.duration) && refVideo.duration > 0) {
         refScrubSlider.max = refVideo.duration;
         refTimeline.classList.add('show');
+        if (loopEndTime === 0) resetLoopRange();
+        refLoopRow.classList.add('show');
       }
     });
 
@@ -1577,6 +1711,8 @@
       currentVideoBlob = null;
       pendingSaveBlob = null;
       pendingSaveFilename = null;
+      loopStartTime = 0;
+      loopEndTime = 0;
       isConverting = false;
       if (reviewPlaybackUrl) { URL.revokeObjectURL(reviewPlaybackUrl); reviewPlaybackUrl = null; }
 
@@ -1590,7 +1726,7 @@
       viewfinder.classList.add('active-view');
       reviewPlayer.style.transform = 'scale(1)';
 
-      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show');
+      masterTimeline.classList.remove('show'); refTimeline.classList.remove('show'); refLoopRow.classList.remove('show');
       syncOffsetRow.classList.remove('show');
       resetSyncOffset();
       downloadBtn.style.display = "none";
