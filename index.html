@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kapa Sync Video Review (V30.4-Demon's Blade)</title>
+  <title>Kapa Sync Video Review (V30.3-Demon's Blade)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -86,6 +86,7 @@
       z-index: 1;
     }
     .gate-btn:active { transform: scale(0.98); filter: brightness(0.85); }
+    .gate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
     .gate-btn::before {
       content: "";
@@ -533,7 +534,7 @@
       <h2>SECURE PORTAL</h2>
       <p>Please enter your access key to begin.</p>
       <input type="password" id="gatePass" class="gate-input" placeholder="••••••••" autofocus>
-      <button onclick="unlockPortal()" class="gate-btn">Tahuna Te Ahi</button>
+      <button onclick="unlockPortal()" class="gate-btn" id="unlockBtn">Tahuna Te Ahi</button>
       <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
       <div class="gate-build-tag">v30.3 - Demon's Blade Build</div>
     </div>
@@ -1129,8 +1130,11 @@
       }
     }
 
-    fetchAccessDatabase();
-    fetchVideoLibrary();
+    // unlockPortal awaits these before building the hub, so a fast login can
+    // never race ahead of the Video Library sheet still loading - that race was
+    // the cause of assigned clips silently going missing for some users.
+    const accessDatabaseReady = fetchAccessDatabase();
+    const videoLibraryReady = fetchVideoLibrary();
 
     // Sets up (or re-points) the HLS player against whatever activeHlsUrl currently
     // is. Destroys any prior instance first, since this now runs every time the
@@ -1198,16 +1202,13 @@
       }
     }
 
-    // Builds the list of clips a given user is allowed to pick from: their
-    // personal default (columns C-E on the Passcode sheet) plus whatever the
-    // Assigned Clips column grants from the Video Library. Deduplicated by the
-    // actual video URL (not just by ID) - this is what catches all of:
-    //  - a user's own default clip also being listed by ID in their Assigned
-    //    Clips column
-    //  - the same Clip ID typed twice in one Assigned Clips cell
-    //  - two different Clip IDs in the Video Library that point at the same URL
-    // Whichever occurrence comes first wins, so "Your Default" always takes
-    // priority over a duplicate assigned entry.
+    // Builds the list of clips a given user is allowed to pick from - purely
+    // whatever the Assigned Clips column grants from the Video Library. If
+    // that's empty, the hub is intentionally left blank (see the empty-state
+    // message in showVideoHub) rather than falling back to anything.
+    // Deduplicated by the actual video URL, in case the same clip ends up
+    // referenced more than once (e.g. the same Clip ID typed twice, or two
+    // different Clip IDs in the Video Library pointing at the same URL).
     function buildClipCards(userRecord) {
       const cards = [];
       const seenUrls = new Set();
@@ -1218,17 +1219,6 @@
         seenUrls.add(normalizedUrl);
         cards.push(card);
       };
-
-      if (userRecord.hlsUrl) {
-        addCard({
-          id: '__default__',
-          name: 'My Practice Video',
-          hlsUrl: userRecord.hlsUrl,
-          thumbnailUrl: userRecord.thumbnailUrl || DEFAULT_THUMBNAIL_URL,
-          thumbnailTime: (userRecord.thumbnailTime !== null && userRecord.thumbnailTime !== undefined) ? userRecord.thumbnailTime : DEFAULT_ALIGN_TIME,
-          isDefault: true
-        });
-      }
 
       const clipIds = userRecord.assignedClipsAll ? Object.keys(clipLibrary) : userRecord.assignedClips;
       clipIds.forEach(id => {
@@ -1246,6 +1236,7 @@
 
       return cards;
     }
+
 
 
     function showVideoHub(userRecord) {
@@ -1329,9 +1320,22 @@
 
     hubSignOutBtn.addEventListener('click', handleSignOut);
 
-    function unlockPortal() {
+    async function unlockPortal() {
       const passInput = document.getElementById('gatePass');
+      const unlockBtn = document.getElementById('unlockBtn');
       const input = passInput ? passInput.value.trim().toLowerCase() : "";
+
+      // Wait for both sheets to finish loading before doing anything - checking
+      // the passcode or building the hub against a not-yet-loaded userDatabase/
+      // clipLibrary is exactly what was causing assigned clips (and occasionally
+      // valid passcodes) to silently fail for whoever logged in fast enough to
+      // race ahead of the fetches.
+      unlockBtn.disabled = true;
+      if (gateError) { gateError.style.display = 'block'; gateError.innerText = 'Loading...'; }
+      await Promise.all([accessDatabaseReady, videoLibraryReady]);
+      unlockBtn.disabled = false;
+      if (gateError) gateError.style.display = 'none';
+
       const userRecord = userDatabase[input];
       if (userRecord) {
         authorizedUser = userRecord.name;
@@ -1342,7 +1346,7 @@
 
         showVideoHub(userRecord);
       } else {
-        if (gateError) gateError.style.display = 'block';
+        if (gateError) { gateError.style.display = 'block'; gateError.innerText = 'Incorrect passcode. Please try again.'; }
         if (passInput) passInput.value = '';
       }
     }
