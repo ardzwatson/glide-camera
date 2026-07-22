@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kapa Sync Video Review (pre-V31.0)</title>
+  <title>Kapa Sync Video Review (PRE 31.0-Demon's Blade)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -175,6 +175,76 @@
     #appContent.loop-only-mode #downloadBtn {
       display: none !important;
     }
+    /* Show the whole video (letterboxed if needed) instead of cropping the
+       sides to fill the box - works the same in portrait or landscape. */
+    #appContent.loop-only-mode #refVideo { object-fit: contain; }
+
+    .ref-fullscreen-btn {
+      display: none;
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      width: 38px;
+      height: 38px;
+      border: none;
+      border-radius: 8px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      font-size: 18px;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 20;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+    .ref-fullscreen-btn:hover { background: rgba(0,0,0,0.8); }
+    .ref-fullscreen-btn:active { transform: scale(0.92); }
+    #appContent.loop-only-mode .ref-fullscreen-btn { display: flex; }
+
+    .ref-volume-control {
+      display: none;
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0,0,0,0.6);
+      padding: 6px 12px;
+      border-radius: 20px;
+      z-index: 20;
+    }
+    #appContent.loop-only-mode .ref-volume-control { display: flex; }
+    .ref-volume-btn {
+      border: none;
+      background: transparent;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 0;
+      display: flex;
+      align-items: center;
+    }
+    .ref-volume-slider {
+      -webkit-appearance: none; appearance: none;
+      width: 70px; height: 4px;
+      background: rgba(255,255,255,0.3);
+      border-radius: 2px;
+      outline: none;
+    }
+    .ref-volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 13px; height: 13px; border-radius: 50%;
+      background: white; cursor: pointer;
+    }
+
+    /* Let the video actually fill the fullscreen view instead of sitting
+       letterboxed inside a browser-default black rectangle. */
+    #videoBox:fullscreen { background: #000; display: flex; align-items: center; justify-content: center; }
+    #videoBox:fullscreen #refVideoContainer,
+    #videoBox:fullscreen #refVideo { width: 100%; height: 100%; }
+    #videoBox:-webkit-full-screen { background: #000; display: flex; align-items: center; justify-content: center; }
+    #videoBox:-webkit-full-screen #refVideoContainer,
+    #videoBox:-webkit-full-screen #refVideo { width: 100%; height: 100%; }
 
     /* --- CONTAINER & WINDOW CONFIGURATION --- */
     .container { display: flex; flex-direction: column; gap: 12px; width: 100%; flex-grow: 1; min-height: 0; }
@@ -197,6 +267,9 @@
       .controls-footer { height: 42px !important; margin-top: 4px !important; gap: 6px !important; }
       button.custom-png-btn, .custom-select-ui { width: 95px !important; height: 34px !important; font-size: 10px !important; }
       .mute-btn-container button { width: 80px !important; height: 26px !important; }
+      .ref-fullscreen-btn { width: 30px !important; height: 30px !important; font-size: 14px !important; bottom: 6px !important; right: 6px !important; }
+      .ref-volume-control { bottom: 6px !important; left: 6px !important; padding: 4px 8px !important; gap: 5px !important; }
+      .ref-volume-slider { width: 50px !important; }
     }
     .box { position: relative; width: 100%; flex: 1 1 0%; height: 0; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
     .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; background: #000; }
@@ -550,7 +623,7 @@
       <input type="password" id="gatePass" class="gate-input" placeholder="••••••••" autofocus>
       <button onclick="unlockPortal()" class="gate-btn" id="unlockBtn">Tahuna Te Ahi</button>
       <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
-      <div class="gate-build-tag">pre-V31.0</div>
+      <div class="gate-build-tag">PRE 31.0 - Demon's Blade Build</div>
     </div>
   </div>
 
@@ -581,6 +654,12 @@
         
         <div id="videoWatermark"></div>
         <div class="countdown-overlay" id="countdown">3</div>
+
+        <div class="ref-volume-control" id="refVolumeControl">
+          <button type="button" class="ref-volume-btn" id="refVolumeBtn" aria-label="Mute/unmute">🔊</button>
+          <input type="range" id="refVolumeSlider" class="ref-volume-slider" min="0" max="1" step="0.05" value="1">
+        </div>
+        <button type="button" class="ref-fullscreen-btn" id="refFullscreenBtn" aria-label="Toggle fullscreen">⛶</button>
       </div>
       
       <div class="box" id="cameraBox">
@@ -638,7 +717,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">pre-V31.0</div>
+      <div class="version-tag">PRE 31.0</div>
     </div>
   </div>
 
@@ -674,6 +753,10 @@
     let webAudioGainNode = null;
 
     const refVideo = document.getElementById('refVideo');
+    const videoBox = document.getElementById('videoBox');
+    const refFullscreenBtn = document.getElementById('refFullscreenBtn');
+    const refVolumeBtn = document.getElementById('refVolumeBtn');
+    const refVolumeSlider = document.getElementById('refVolumeSlider');
     const gateError = document.getElementById('gateError');
     const watermarkEl = document.getElementById('videoWatermark');
     const signOutBtn = document.getElementById('signOutBtn');
@@ -929,6 +1012,57 @@
       if (isPreviewingRef && (refVideo.currentTime < loopStartTime || refVideo.currentTime > loopEndTime)) {
         refVideo.currentTime = loopStartTime;
       }
+    });
+
+    // --- Loop Practice screen: fullscreen + volume ---
+    function isRefFullscreen() {
+      return !!(document.fullscreenElement || document.webkitFullscreenElement);
+    }
+
+    function updateFullscreenBtnIcon() {
+      refFullscreenBtn.textContent = isRefFullscreen() ? '⤢' : '⛶';
+    }
+    document.addEventListener('fullscreenchange', updateFullscreenBtnIcon);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenBtnIcon);
+
+    refFullscreenBtn.addEventListener('click', () => {
+      if (isRefFullscreen()) {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        return;
+      }
+
+      // iOS Safari doesn't support fullscreening arbitrary elements - it only
+      // supports a video-specific fullscreen API instead. Use that when present
+      // (this shows Apple's own native video player chrome instead of ours, but
+      // the loop still keeps working since the underlying <video> element and
+      // its timeupdate-driven loop enforcement are unaffected either way).
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS && typeof refVideo.webkitEnterFullscreen === 'function') {
+        refVideo.webkitEnterFullscreen();
+        return;
+      }
+
+      if (videoBox.requestFullscreen) videoBox.requestFullscreen().catch(() => {});
+      else if (videoBox.webkitRequestFullscreen) videoBox.webkitRequestFullscreen();
+    });
+
+    function updateVolumeBtnIcon() {
+      if (refVideo.muted || refVideo.volume === 0) refVolumeBtn.textContent = '🔇';
+      else if (refVideo.volume < 0.5) refVolumeBtn.textContent = '🔉';
+      else refVolumeBtn.textContent = '🔊';
+    }
+
+    refVolumeBtn.addEventListener('click', () => {
+      refVideo.muted = !refVideo.muted;
+      updateVolumeBtnIcon();
+    });
+
+    refVolumeSlider.addEventListener('input', () => {
+      const level = parseFloat(refVolumeSlider.value);
+      refVideo.volume = level;
+      refVideo.muted = level === 0;
+      updateVolumeBtnIcon();
     });
 
     // --- Save/Share state ---
