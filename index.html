@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kapa Sync Video Review (V30.4-Demon's Blade)</title>
+  <title>Kapa Sync Video Review (pre-V31.0)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -164,12 +164,25 @@
       height: 100%;
     }
 
+    /* Loop-only clips (Video Library column G): no camera, no recording -
+       just the reference video and its loop practice controls, expanded to
+       fill the space the camera box would otherwise take. */
+    #appContent.loop-only-mode #cameraBox,
+    #appContent.loop-only-mode #actionBtn,
+    #appContent.loop-only-mode #resetBtn,
+    #appContent.loop-only-mode #overlayToggleBtn,
+    #appContent.loop-only-mode #opacitySelector,
+    #appContent.loop-only-mode #downloadBtn {
+      display: none !important;
+    }
+
     /* --- CONTAINER & WINDOW CONFIGURATION --- */
     .container { display: flex; flex-direction: column; gap: 12px; width: 100%; flex-grow: 1; min-height: 0; }
     @media (orientation: landscape) {
       body, html { padding: env(safe-area-inset-top, 4px) 8px calc(env(safe-area-inset-bottom, 0px) + 4px) 8px; }
       .container { flex-direction: row; gap: 8px; }
       .box { height: 100% !important; width: 50% !important; }
+      #appContent.loop-only-mode #videoBox { width: 100% !important; }
       .label, .rec-indicator { top: 6px !important; left: 6px !important; font-size: 9px !important; padding: 2px 6px !important; }
       .rec-indicator { right: 6px !important; left: auto !important; }
       .zoom-container { bottom: 6px !important; padding: 4px 8px !important; }
@@ -515,6 +528,7 @@
       padding: 0 10px 6px 10px;
       text-align: center;
     }
+    .hub-card-badge-loop { color: #ff9500; }
 
     .hub-empty-message {
       color: #8e8e93;
@@ -536,7 +550,7 @@
       <input type="password" id="gatePass" class="gate-input" placeholder="••••••••" autofocus>
       <button onclick="unlockPortal()" class="gate-btn" id="unlockBtn">Tahuna Te Ahi</button>
       <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
-      <div class="gate-build-tag">v30.4 - Demon's Blade Build</div>
+      <div class="gate-build-tag">pre-V31.0</div>
     </div>
   </div>
 
@@ -624,7 +638,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V30.4</div>
+      <div class="version-tag">pre-V31.0</div>
     </div>
   </div>
 
@@ -1145,11 +1159,20 @@
             console.warn(`Video Library row ${rowNum} ("${clipId}"): HLS URL doesn't look like a .m3u8 link - "${hlsUrl}". Check this row's column alignment.`);
           }
 
+          // Column G checkbox: reference-video-only clip with the loop practice
+          // controls, no camera/recording involved. Column H checkbox: skip the
+          // watermark for this specific clip. Google Sheets exports checkboxes
+          // as the literal text TRUE/FALSE.
+          const isLoopOnly = (columns[6] || '').trim().toUpperCase() === 'TRUE';
+          const noWatermark = (columns[7] || '').trim().toUpperCase() === 'TRUE';
+
           clipLibrary[clipId] = {
             name: clipName,
             hlsUrl,
             thumbnailUrl: thumbnailUrl || null,
-            thumbnailTime
+            thumbnailTime,
+            isLoopOnly,
+            noWatermark
           };
         });
         console.info(`Video Library loaded: ${Object.keys(clipLibrary).length} clip(s) - [${Object.keys(clipLibrary).join(', ')}]`);
@@ -1258,7 +1281,9 @@
           hlsUrl: clip.hlsUrl,
           thumbnailUrl: clip.thumbnailUrl || DEFAULT_THUMBNAIL_URL,
           thumbnailTime: (clip.thumbnailTime !== null && clip.thumbnailTime !== undefined) ? clip.thumbnailTime : DEFAULT_ALIGN_TIME,
-          isDefault: false
+          isDefault: false,
+          isLoopOnly: !!clip.isLoopOnly,
+          noWatermark: !!clip.noWatermark
         });
       });
 
@@ -1296,6 +1321,11 @@
             badge.className = 'hub-card-badge';
             badge.textContent = 'Your Default';
             card.appendChild(badge);
+          } else if (clip.isLoopOnly) {
+            const badge = document.createElement('div');
+            badge.className = 'hub-card-badge hub-card-badge-loop';
+            badge.textContent = 'Loop Practice';
+            card.appendChild(badge);
           }
 
           card.addEventListener('click', () => selectClipAndEnterApp(clip));
@@ -1307,12 +1337,18 @@
     }
 
     function selectClipAndEnterApp(clip) {
+      if (clip.isLoopOnly) {
+        enterLoopOnlyMode(clip);
+        return;
+      }
+
       activeHlsUrl = clip.hlsUrl;
       activeThumbnailUrl = clip.thumbnailUrl;
       activeAlignTime = clip.thumbnailTime;
 
       videoHubScreen.classList.remove('show');
       document.getElementById('appContent').style.display = 'flex';
+      document.getElementById('appContent').classList.remove('loop-only-mode');
       changeClipBtn.style.display = 'block';
 
       // Apply this clip's poster/thumbnail everywhere it's used - the video
@@ -1330,6 +1366,37 @@
         // to re-request it, just refresh the idle display for the new video.
         setupInitialState();
       }
+    }
+
+    // Loop-only clips (Video Library column G) skip the camera entirely - just
+    // the reference video and its loop practice controls, auto-started so the
+    // user doesn't need an extra tap to begin. Reuses the exact same Preview Ref
+    // machinery (loop dragging, throttled seeking, etc.) already built for the
+    // camera flow, just with the camera-related UI hidden via the loop-only-mode
+    // CSS class on #appContent.
+    function enterLoopOnlyMode(clip) {
+      activeHlsUrl = clip.hlsUrl;
+      activeThumbnailUrl = clip.thumbnailUrl;
+      activeAlignTime = clip.thumbnailTime;
+
+      videoHubScreen.classList.remove('show');
+      document.getElementById('appContent').style.display = 'flex';
+      document.getElementById('appContent').classList.add('loop-only-mode');
+      changeClipBtn.style.display = 'block';
+
+      refVideo.setAttribute('poster', activeThumbnailUrl);
+      initializeReferenceVideoPlayback();
+
+      if (clip.noWatermark) {
+        if (watermarkTimer) clearInterval(watermarkTimer);
+        watermarkEl.classList.remove('watermark-active');
+      } else {
+        startWatermarkEngine();
+      }
+
+      // No camera needed - go straight into the preview/loop experience by
+      // reusing the exact same click handler that Preview Ref uses.
+      previewRefBtn.click();
     }
 
     function returnToVideoHub() {
@@ -1418,6 +1485,7 @@
       cameraOverlay.classList.remove('hidden');
       actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
       resetBtn.innerText = "Reset / Clear"; resetBtn.disabled = true; resetBtn.style.display = "none"; resetBtn.classList.remove('danger-active');
+      document.getElementById('appContent').classList.remove('loop-only-mode');
     }
 
     function handleSignOut() {
