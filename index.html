@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kapa Sync Video Review (V30.3-Demon's Blade)</title>
+  <title>Kapa Sync Video Review (V30.4-Demon's Blade)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -536,7 +536,7 @@
       <input type="password" id="gatePass" class="gate-input" placeholder="••••••••" autofocus>
       <button onclick="unlockPortal()" class="gate-btn" id="unlockBtn">Tahuna Te Ahi</button>
       <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
-      <div class="gate-build-tag">v30.3 - Demon's Blade Build</div>
+      <div class="gate-build-tag">v30.4 - Demon's Blade Build</div>
     </div>
   </div>
 
@@ -624,7 +624,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">V30.3</div>
+      <div class="version-tag">V30.4</div>
     </div>
   </div>
 
@@ -1013,30 +1013,48 @@
       }
     });
 
-    // Handles quoted fields (so commas inside a URL's query string, if any,
-    // don't get mistaken for column separators) - the naive .split(',') this
-    // replaces would silently mis-parse rows like that.
-    function parseCsvLine(line) {
-      const result = [];
-      let current = '';
+    // Parses an entire CSV payload at once, rather than splitting into lines
+    // first. This matters because a cell containing a line break (someone hit
+    // Enter while typing a name, for example) gets wrapped in quotes by Google
+    // Sheets' CSV export, with the literal line break preserved inside those
+    // quotes - splitting on newlines before understanding quote state breaks
+    // that row in half and corrupts everything parsed from it onward. Returns
+    // an array of rows, each an array of trimmed column values.
+    function parseCsvFull(text) {
+      const rows = [];
+      let row = [];
+      let field = '';
       let inQuotes = false;
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
         if (inQuotes) {
           if (char === '"') {
-            if (line[i + 1] === '"') { current += '"'; i++; }
+            if (text[i + 1] === '"') { field += '"'; i++; }
             else { inQuotes = false; }
           } else {
-            current += char;
+            field += char;
           }
+        } else if (char === '"') {
+          inQuotes = true;
+        } else if (char === ',') {
+          row.push(field);
+          field = '';
+        } else if (char === '\r') {
+          // ignore - line endings are handled on \n below
+        } else if (char === '\n') {
+          row.push(field);
+          rows.push(row);
+          row = [];
+          field = '';
         } else {
-          if (char === '"') { inQuotes = true; }
-          else if (char === ',') { result.push(current); current = ''; }
-          else { current += char; }
+          field += char;
         }
       }
-      result.push(current);
-      return result.map(v => v.trim());
+      if (field !== '' || row.length > 0) {
+        row.push(field);
+        rows.push(row);
+      }
+      return rows.map(r => r.map(v => v.trim()));
     }
 
     async function fetchAccessDatabase() {
@@ -1044,22 +1062,19 @@
         const response = await fetch(GOOGLE_SHEET_CSV_URL);
         if (!response.ok) throw new Error("Database sync failed");
         const csvText = await response.text();
-        const lines = csvText.split(/\r?\n/);
+        const rows = parseCsvFull(csvText);
 
+        // Row 1 is always the header row - never treated as data, regardless
+        // of what the header cells actually say.
+        const headerRow = rows[0] || [];
         // Cell H1 (row 1, column H / index 7) drives the watermark's trailing tag.
-        if (lines.length > 0 && lines[0].trim()) {
-          const headerColumns = parseCsvLine(lines[0]);
-          if (headerColumns[7]) watermarkTag = headerColumns[7].trim();
-        }
+        if (headerRow[7]) watermarkTag = headerRow[7].trim();
         // Cell H2 (row 2, column H) drives the mobile-only second watermark line.
-        if (lines.length > 1 && lines[1].trim()) {
-          const row2Columns = parseCsvLine(lines[1]);
-          if (row2Columns[7]) watermarkTagMobile = row2Columns[7].trim();
-        }
+        const row2 = rows[1] || [];
+        if (row2[7]) watermarkTagMobile = row2[7].trim();
 
-        lines.forEach(line => {
-          if (!line.trim()) return;
-          const columns = parseCsvLine(line);
+        rows.slice(1).forEach(columns => {
+          if (columns.every(v => v === '')) return; // blank row
           const passcode = (columns[0] || '').toLowerCase();
           const name = columns[1] || '';
           const hlsUrl = (columns[2] || '').trim();
@@ -1078,7 +1093,6 @@
             : assignedClipsRaw.split(',').map(id => id.trim().toLowerCase()).filter(id => id !== '');
 
           if (!passcode || !name) return;
-          if (passcode === 'passcode' || passcode === 'passcodes') return; // skip a header row if present
 
           // HLS URL/Thumbnail URL/Thumbnail Time are all optional per row - rows
           // that leave them blank fall back to the defaults.
@@ -1101,13 +1115,12 @@
         const response = await fetch(VIDEO_LIBRARY_CSV_URL);
         if (!response.ok) throw new Error("Video library sync failed");
         const csvText = await response.text();
-        const lines = csvText.split(/\r?\n/);
+        const rows = parseCsvFull(csvText);
 
-        let rowNum = 0;
-        lines.forEach(line => {
-          rowNum++;
-          if (!line.trim()) return;
-          const columns = parseCsvLine(line);
+        // Row 1 is always the header row - never treated as data.
+        rows.slice(1).forEach((columns, index) => {
+          const rowNum = index + 2; // sheet row number, for readable warnings
+          if (columns.every(v => v === '')) return; // blank row
           const clipId = (columns[0] || '').trim().toLowerCase();
           const clipName = (columns[1] || '').trim();
           const hlsUrl = (columns[2] || '').trim();
@@ -1116,8 +1129,6 @@
           const thumbnailTime = thumbnailTimeRaw !== '' && !isNaN(parseFloat(thumbnailTimeRaw)) && parseFloat(thumbnailTimeRaw) >= 0
             ? parseFloat(thumbnailTimeRaw)
             : null;
-
-          if (clipId === 'clip id' || clipId === 'clip_id' || clipId === 'clipid') return; // skip a header row if present
 
           if (!clipId || !clipName || !hlsUrl) {
             console.warn(
