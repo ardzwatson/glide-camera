@@ -64,6 +64,13 @@
       transition: border-color 0.2s ease;
     }
     .gate-input:focus { border-color: #ff453a; }
+    /* Using type="text" (not type="password") so mobile browsers never fall
+       back to a numeric-only keypad for this field - some browsers/keyboards
+       apply that restriction heuristically to password-type inputs believing
+       they're a numeric PIN, which silently blocked symbols like '#'.
+       -webkit-text-security visually masks the characters as dots instead,
+       giving the same private appearance without that keyboard restriction. */
+    .gate-input-masked { -webkit-text-security: disc; text-security: disc; }
     
     .gate-btn {
       position: relative;
@@ -681,7 +688,7 @@
     <div class="gate-card">
       <h2>SECURE PORTAL</h2>
       <p>Please enter your access key to begin.</p>
-      <input type="password" id="gatePass" class="gate-input" inputmode="text" pattern=".*" placeholder="••••••••" autofocus>
+      <input type="text" id="gatePass" class="gate-input gate-input-masked" inputmode="text" pattern=".*" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Access Key" autofocus>
       <button onclick="unlockPortal()" class="gate-btn" id="unlockBtn">Tahuna Te Ahi</button>
       <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
       <div class="gate-build-tag">31.1 - Raging Storm Build</div>
