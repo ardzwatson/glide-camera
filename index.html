@@ -606,46 +606,61 @@
       justify-content: space-between;
       margin-bottom: 18px;
       flex-shrink: 0;
-      gap: 12px;
+      flex-wrap: nowrap;
+      gap: clamp(6px, 2vw, 12px);
+      min-width: 0;
+      width: 100%;
     }
     .hub-title {
       font-family: 'Marcellus', serif;
       color: white;
-      font-size: 20px;
+      /* Scales continuously with viewport width instead of wrapping onto a
+         second line when the actions on the right don't leave enough room. */
+      font-size: clamp(13px, 4.5vw, 20px);
       margin: 0;
       letter-spacing: 0.5px;
       text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      flex: 1 1 auto;
     }
     .hub-topbar-actions {
       display: flex;
       align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
+      gap: clamp(4px, 1.5vw, 8px);
+      flex-shrink: 1;
+      flex-basis: content;
+      min-width: 0;
     }
     .hub-tag-filter {
       font-family: 'Marcellus', serif;
-      font-size: 11px;
+      font-size: clamp(9px, 2.6vw, 11px);
       font-weight: bold;
       color: white;
       background: #1c1c1e;
       border: 1px solid #3a3a3c;
       border-radius: 6px;
-      padding: 8px 10px;
+      padding: clamp(5px, 1.5vw, 8px) clamp(6px, 2vw, 10px);
       cursor: pointer;
       outline: none;
-      flex-shrink: 0;
+      flex-shrink: 1;
+      min-width: 0;
+      max-width: 30vw;
     }
     .hub-signout-btn {
       font-family: 'Marcellus', serif;
-      font-size: 11px;
+      font-size: clamp(9px, 2.6vw, 11px);
       font-weight: bold;
       color: #ff453a;
       background: transparent;
       border: 1px solid rgba(255, 69, 58, 0.3);
       border-radius: 6px;
-      padding: 8px 12px;
+      padding: clamp(5px, 1.5vw, 8px) clamp(7px, 2vw, 12px);
       cursor: pointer;
       flex-shrink: 0;
+      white-space: nowrap;
     }
     .hub-signout-btn:hover { background: rgba(255, 69, 58, 0.1); }
 
@@ -726,7 +741,7 @@
   <!-- VIDEO HUB SCREEN -->
   <div id="videoHubScreen">
     <div class="hub-topbar">
-     <h2 class="hub-title" style="font-size: 1.2rem;">🔥 Te Ahi Kā 🔥</h2>
+      <h2 class="hub-title">🔥 Te Ahi Kā 🔥</h2>
       <div class="hub-topbar-actions">
         <select id="hubTagFilter" class="hub-tag-filter" aria-label="Filter by tag">
           <option value="all">All</option>
