@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kapa Sync Video Review (31.2-Demon's Blade)</title>
+  <title>Kapa Sync Video Review (31.1-Demon's Blade)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -14,7 +14,13 @@
   
   <style>
     body, html { 
-      margin: 0; height: 100dvh; width: 100%; box-sizing: border-box; background: #111; color: white; 
+      margin: 0; height: 100dvh; width: 100%; box-sizing: border-box; color: white; 
+      background-color: #111;
+      background-image: url('https://lh3.googleusercontent.com/d/1B2Dk1T1vTjx0QaqoJIPZs9wvx09M60AG');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
       font-family: 'Marcellus', -apple-system, BlinkMacSystemFont, serif; overflow: hidden; display: flex; flex-direction: column;
       padding: env(safe-area-inset-top, 8px) 12px calc(env(safe-area-inset-bottom, 0px) + 8px) 12px;
     }
@@ -23,7 +29,7 @@
     #passwordGate {
       position: fixed;
       inset: 0;
-      background: #111;
+      background: rgba(17, 17, 17, 0.6);
       z-index: 9999;
       display: flex;
       flex-direction: column;
@@ -584,7 +590,7 @@
     #videoHubScreen {
       position: fixed;
       inset: 0;
-      background: #111;
+      background: rgba(17, 17, 17, 0.7);
       z-index: 9998;
       display: none;
       flex-direction: column;
@@ -608,6 +614,7 @@
       font-size: 20px;
       margin: 0;
       letter-spacing: 0.5px;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
     }
     .hub-topbar-actions {
       display: flex;
@@ -665,24 +672,11 @@
     .hub-card.hub-card-default { border-color: #5856d6; }
 
     .hub-card-thumb {
-      position: relative;
       width: 100%;
       aspect-ratio: 16 / 9;
       background-size: cover;
       background-position: center;
       background-color: #000;
-    }
-    /* Sized to match the card title's font-size (.hub-card-name) so the icon
-       reads at the same visual scale as the text beneath it, regardless of
-       the icon image's native dimensions. */
-    .hub-card-icon {
-      position: absolute;
-      top: 6px;
-      left: 6px;
-      height: 12px;
-      width: auto;
-      opacity: 0.4;
-      pointer-events: none;
     }
     .hub-card-name {
       font-family: 'Marcellus', serif;
@@ -702,18 +696,6 @@
       text-align: center;
     }
     .hub-card-badge-loop { color: #ff9500; }
-
-    /* Matches .hub-card-badge's font-size - colour is set inline per-card
-       from the Video Library's Icon Colour column. */
-    .hub-card-tag {
-      font-family: 'Marcellus', serif;
-      font-size: 9px;
-      font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      text-align: center;
-      padding: 0 10px 8px 10px;
-    }
 
     .hub-empty-message {
       color: #8e8e93;
@@ -1661,14 +1643,6 @@
         const thumb = document.createElement('div');
         thumb.className = 'hub-card-thumb';
         thumb.style.backgroundImage = `url('${clip.thumbnailUrl}')`;
-
-        if (clip.icon) {
-          const iconImg = document.createElement('img');
-          iconImg.className = 'hub-card-icon';
-          iconImg.src = clip.icon;
-          iconImg.alt = '';
-          thumb.appendChild(iconImg);
-        }
         card.appendChild(thumb);
 
         const name = document.createElement('div');
@@ -1686,14 +1660,6 @@
           badge.className = 'hub-card-badge hub-card-badge-loop';
           badge.textContent = 'Loop Practice';
           card.appendChild(badge);
-        }
-
-        if (clip.tag) {
-          const tagEl = document.createElement('div');
-          tagEl.className = 'hub-card-tag';
-          tagEl.textContent = clip.tag;
-          tagEl.style.color = clip.iconColor || '#ffffff';
-          card.appendChild(tagEl);
         }
 
         card.addEventListener('click', () => selectClipAndEnterApp(clip));
