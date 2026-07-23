@@ -296,6 +296,41 @@
       .ref-volume-control { bottom: 6px !important; left: 6px !important; padding: 4px 8px !important; gap: 5px !important; }
       .ref-volume-slider { width: 50px !important; }
     }
+
+    /* Mobile landscape only (short-viewport phones held sideways): the vertical
+       side-tab Sign Out / Change Clip buttons sit at 58% down the screen edges,
+       which on a short landscape viewport lands right on top of the reference
+       video's own fullscreen toggle (bottom-right) and volume control
+       (bottom-left). Relocate both buttons to the top of the screen instead,
+       as small horizontal pills, so they never overlap the video controls.
+       Scoped tightly by max-height so normal landscape tablets/desktops and
+       portrait phones are completely unaffected. */
+    @media screen and (orientation: landscape) and (max-height: 600px) {
+      #signOutBtn {
+        top: env(safe-area-inset-top, 4px);
+        left: 8px;
+        transform: none;
+        writing-mode: horizontal-tb;
+        border: 1px solid rgba(255, 69, 58, 0.3);
+        border-radius: 8px;
+        padding: 5px 10px;
+        font-size: 9px;
+      }
+      #signOutBtn:hover { padding-left: 10px; background-color: rgba(0, 0, 0, 0.35); }
+
+      #changeClipBtn {
+        top: env(safe-area-inset-top, 4px);
+        right: 8px;
+        transform: none;
+        writing-mode: horizontal-tb;
+        border: 1px solid rgba(0, 122, 255, 0.3);
+        border-radius: 8px;
+        padding: 5px 10px;
+        font-size: 9px;
+      }
+      #changeClipBtn:hover { padding-right: 10px; background-color: rgba(0, 0, 0, 0.35); }
+    }
+
     .box { position: relative; width: 100%; flex: 1 1 0%; height: 0; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
     .viewfinder-container { width: 100%; height: 100%; position: relative; overflow: hidden; background: #000; }
     
@@ -646,7 +681,7 @@
     <div class="gate-card">
       <h2>SECURE PORTAL</h2>
       <p>Please enter your access key to begin.</p>
-      <input type="password" id="gatePass" class="gate-input" placeholder="••••••••" autofocus>
+      <input type="password" id="gatePass" class="gate-input" inputmode="text" pattern=".*" placeholder="••••••••" autofocus>
       <button onclick="unlockPortal()" class="gate-btn" id="unlockBtn">Tahuna Te Ahi</button>
       <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
       <div class="gate-build-tag">31.1 - Raging Storm Build</div>
