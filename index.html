@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kapa Sync Video Review (31.1-Demon's Blade)</title>
+  <title>Kapa Sync Video Review (31.2-Raging Storm)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -717,7 +717,7 @@
       <input type="text" id="gatePass" class="gate-input gate-input-masked" inputmode="text" placeholder="Access Key" autofocus>
       <button onclick="unlockPortal()" class="gate-btn" id="unlockBtn">Tahuna Te Ahi</button>
       <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
-      <div class="gate-build-tag">31.1 - Demon's Blade Build</div>
+      <div class="gate-build-tag">31.2 - Raging Storm Build</div>
     </div>
   </div>
 
@@ -817,7 +817,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">31.1</div>
+      <div class="version-tag">31.2 - Raging Storm</div>
     </div>
   </div>
 
@@ -1672,6 +1672,10 @@
       currentHubCards = cards;
       populateTagFilter(cards);
       renderHubGrid(cards);
+      // The hub screen has its own dedicated Sign Out button (hubSignOutBtn);
+      // hide the persistent side-tab one while the hub is up so it can't
+      // ghost/bleed through the hub's semi-transparent background.
+      signOutBtn.style.display = 'none';
       videoHubScreen.classList.add('show');
     }
 
@@ -1696,6 +1700,7 @@
       document.getElementById('appContent').style.display = 'flex';
       document.getElementById('appContent').classList.remove('loop-only-mode');
       changeClipBtn.style.display = 'block';
+      signOutBtn.style.display = 'block';
 
       // Apply this clip's poster/thumbnail everywhere it's used - the video
       // poster and the translucent camera alignment guide.
@@ -1731,6 +1736,7 @@
       document.getElementById('appContent').style.display = 'flex';
       document.getElementById('appContent').classList.add('loop-only-mode');
       changeClipBtn.style.display = 'block';
+      signOutBtn.style.display = 'block';
 
       refVideo.setAttribute('poster', activeThumbnailUrl);
       initializeReferenceVideoPlayback();
@@ -1804,7 +1810,6 @@
         currentPasscode = input;
 
         document.getElementById('passwordGate').style.display = 'none';
-        signOutBtn.style.display = 'block';
 
         showVideoHub(userRecord);
       } else {
