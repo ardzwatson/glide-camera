@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kapa Sync Video Review (31.0-Raging Storm)</title>
+  <title>Kapa Sync Video Review (31.1-Raging Storm)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -201,6 +201,31 @@
     .ref-fullscreen-btn:active { transform: scale(0.92); }
     #appContent.loop-only-mode .ref-fullscreen-btn { display: flex; }
 
+    .ref-fs-playpause-btn {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 76px;
+      height: 76px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.5);
+      color: white;
+      font-size: 30px;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 21;
+      opacity: 1;
+      transition: opacity 0.25s ease, background 0.15s ease, transform 0.1s ease;
+    }
+    .ref-fs-playpause-btn:hover { background: rgba(0,0,0,0.7); }
+    .ref-fs-playpause-btn:active { transform: translate(-50%, -50%) scale(0.92); }
+    .ref-fs-playpause-btn.fade-out { opacity: 0; pointer-events: none; }
+    #videoBox.ref-is-fullscreen .ref-fs-playpause-btn { display: flex; }
+
     .ref-volume-control {
       display: none;
       position: absolute;
@@ -388,6 +413,7 @@
     
     #previewRefBtn { background: linear-gradient(135deg, #8280e0, #3f3da3); border-radius: 8px; }
     #previewRefBtn.previewing { background: linear-gradient(135deg, #ffb347, #cc7700) !important; }
+    #previewRefBtn.ready-to-play { background: linear-gradient(135deg, #5ed17d, #248f41) !important; }
     
     #resetBtn { background: linear-gradient(135deg, #b0b0b5, #6c6c70); border-radius: 8px; display: none; }
     #resetBtn.danger-active { background: linear-gradient(135deg, #ff6f66, #cc2c23); }
@@ -623,7 +649,7 @@
       <input type="password" id="gatePass" class="gate-input" placeholder="••••••••" autofocus>
       <button onclick="unlockPortal()" class="gate-btn" id="unlockBtn">Tahuna Te Ahi</button>
       <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
-      <div class="gate-build-tag">31.0 - Raging Storm Build</div>
+      <div class="gate-build-tag">31.1 - Raging Storm Build</div>
     </div>
   </div>
 
@@ -660,6 +686,7 @@
           <input type="range" id="refVolumeSlider" class="ref-volume-slider" min="0" max="1" step="0.05" value="1">
         </div>
         <button type="button" class="ref-fullscreen-btn" id="refFullscreenBtn" aria-label="Toggle fullscreen">⛶</button>
+        <button type="button" class="ref-fs-playpause-btn" id="refFsPlayPauseBtn" aria-label="Play/Pause">▶</button>
       </div>
       
       <div class="box" id="cameraBox">
@@ -717,7 +744,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">31.0</div>
+      <div class="version-tag">31.1</div>
     </div>
   </div>
 
@@ -752,9 +779,19 @@
     let webAudioSourceNode = null;
     let webAudioGainNode = null;
 
+    // True whenever the currently loaded clip is a loop-only (no camera)
+    // clip. Drives: unconditional looping regardless of narrowed range, and
+    // a static centered watermark instead of the drifting camera-flow one.
+    let currentClipIsLoopOnly = false;
+    // True from the moment a loop-only clip is entered until the user's first
+    // real tap on Preview Ref - playback is staged (paused, ready) but not
+    // yet started, so the clip never autoplays.
+    let loopOnlyAwaitingFirstPlay = false;
+
     const refVideo = document.getElementById('refVideo');
     const videoBox = document.getElementById('videoBox');
     const refFullscreenBtn = document.getElementById('refFullscreenBtn');
+    const refFsPlayPauseBtn = document.getElementById('refFsPlayPauseBtn');
     const refVolumeBtn = document.getElementById('refVolumeBtn');
     const refVolumeSlider = document.getElementById('refVolumeSlider');
     const gateError = document.getElementById('gateError');
@@ -1021,6 +1058,14 @@
 
     function updateFullscreenBtnIcon() {
       refFullscreenBtn.textContent = isRefFullscreen() ? '⤢' : '⛶';
+      videoBox.classList.toggle('ref-is-fullscreen', isRefFullscreen());
+      if (isRefFullscreen()) {
+        updateFsPlayPauseIcon();
+        resetFsPlayPauseFadeTimer();
+      } else {
+        clearTimeout(fsPlayPauseFadeTimeout);
+        refFsPlayPauseBtn.classList.remove('fade-out');
+      }
     }
     document.addEventListener('fullscreenchange', updateFullscreenBtnIcon);
     document.addEventListener('webkitfullscreenchange', updateFullscreenBtnIcon);
@@ -1045,6 +1090,59 @@
 
       if (videoBox.requestFullscreen) videoBox.requestFullscreen().catch(() => {});
       else if (videoBox.webkitRequestFullscreen) videoBox.webkitRequestFullscreen();
+    });
+
+    // --- Fullscreen center play/pause button ---
+    // Mirrors the .zoom-container fade-out pattern from the camera screen:
+    // shown on load/tap/move, auto-hides after a short idle period while
+    // fullscreen playback is running.
+    let fsPlayPauseFadeTimeout = null;
+
+    function resetFsPlayPauseFadeTimer() {
+      if (!isRefFullscreen()) return;
+      refFsPlayPauseBtn.classList.remove('fade-out');
+      clearTimeout(fsPlayPauseFadeTimeout);
+      fsPlayPauseFadeTimeout = setTimeout(() => {
+        if (isRefFullscreen() && !refVideo.paused) refFsPlayPauseBtn.classList.add('fade-out');
+      }, 2500);
+    }
+
+    function updateFsPlayPauseIcon() {
+      refFsPlayPauseBtn.textContent = refVideo.paused ? '▶' : '⏸';
+    }
+
+    videoBox.addEventListener('click', (e) => {
+      if (!isRefFullscreen()) return;
+      if (e.target === refFsPlayPauseBtn || e.target === refFullscreenBtn) return;
+      if (refVideo.paused) refVideo.play().catch(() => {});
+      else refVideo.pause();
+      resetFsPlayPauseFadeTimer();
+    });
+
+    refFsPlayPauseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (refVideo.paused) refVideo.play().catch(() => {});
+      else refVideo.pause();
+      resetFsPlayPauseFadeTimer();
+    });
+
+    videoBox.addEventListener('mousemove', () => { if (isRefFullscreen()) resetFsPlayPauseFadeTimer(); });
+    videoBox.addEventListener('touchstart', () => { if (isRefFullscreen()) resetFsPlayPauseFadeTimer(); });
+
+    // Keep the fullscreen center button / Preview Ref label in sync with the
+    // reference video's actual play state, without clobbering button text used
+    // during recording countdown or synced review playback.
+    refVideo.addEventListener('play', () => {
+      if (isRefFullscreen()) updateFsPlayPauseIcon();
+      if (isPreviewingRef && !loopOnlyAwaitingFirstPlay && !isRecordingMode && !isReviewMode) {
+        previewRefBtn.innerText = "Pause Preview";
+      }
+    });
+    refVideo.addEventListener('pause', () => {
+      if (isRefFullscreen()) updateFsPlayPauseIcon();
+      if (isPreviewingRef && !loopOnlyAwaitingFirstPlay && !isRecordingMode && !isReviewMode) {
+        previewRefBtn.innerText = "Resume Preview";
+      }
     });
 
     function updateVolumeBtnIcon() {
@@ -1476,6 +1574,7 @@
         return;
       }
 
+      currentClipIsLoopOnly = false;
       activeHlsUrl = clip.hlsUrl;
       activeThumbnailUrl = clip.thumbnailUrl;
       activeAlignTime = clip.thumbnailTime;
@@ -1503,12 +1602,14 @@
     }
 
     // Loop-only clips (Video Library column G) skip the camera entirely - just
-    // the reference video and its loop practice controls, auto-started so the
-    // user doesn't need an extra tap to begin. Reuses the exact same Preview Ref
-    // machinery (loop dragging, throttled seeking, etc.) already built for the
-    // camera flow, just with the camera-related UI hidden via the loop-only-mode
-    // CSS class on #appContent.
+    // the reference video and its loop practice controls. Reuses the exact same
+    // Preview Ref machinery (loop dragging, throttled seeking, etc.) already
+    // built for the camera flow, just with the camera-related UI hidden via the
+    // loop-only-mode CSS class on #appContent. Playback is staged but does NOT
+    // autostart - the user taps the (now green "ready") Preview Ref button to
+    // begin, via the loopOnlyAwaitingFirstPlay branch in that click handler.
     function enterLoopOnlyMode(clip) {
+      currentClipIsLoopOnly = true;
       activeHlsUrl = clip.hlsUrl;
       activeThumbnailUrl = clip.thumbnailUrl;
       activeAlignTime = clip.thumbnailTime;
@@ -1528,9 +1629,28 @@
         startWatermarkEngine();
       }
 
-      // No camera needed - go straight into the preview/loop experience by
-      // reusing the exact same click handler that Preview Ref uses.
-      previewRefBtn.click();
+      // Stage the preview state (loop UI visible, video parked at the start)
+      // without starting playback - the first real tap on Preview Ref does that.
+      isPreviewingRef = true;
+      loopOnlyAwaitingFirstPlay = true;
+      previewRefBtn.innerText = "Preview Ref";
+      previewRefBtn.classList.remove('previewing');
+      previewRefBtn.classList.add('ready-to-play');
+      refLabel.innerHTML = `<span>REFERENCE LESSON (PREVIEWING)</span>`;
+
+      const stageAtStart = () => {
+        if (refVideo.duration && isFinite(refVideo.duration) && refVideo.duration > 0) {
+          resetLoopRange();
+          refTimeline.classList.add('show');
+          refVideo.currentTime = loopStartTime;
+          updateRefTrackUi();
+          updateRefTimeDisplay(loopStartTime);
+        } else {
+          refVideo.addEventListener('loadedmetadata', stageAtStart, { once: true });
+        }
+      };
+      refVideo.pause();
+      stageAtStart();
     }
 
     function returnToVideoHub() {
@@ -1587,12 +1707,14 @@
     function resetRecordingReviewState() {
       cleanupIsolatedAudioPipeline();
       clearTimeout(zoomFadeTimeout);
+      clearTimeout(fsPlayPauseFadeTimeout);
       if (watermarkTimer) clearInterval(watermarkTimer);
       if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
 
       isRecordingMode = false; isReviewMode = false; isReviewPlaying = false; isPreviewingRef = false; recordedChunks = []; currentVideoBlob = null; chosenScale = 1; isSeeking = false; isConverting = false;
       pendingSaveBlob = null; pendingSaveFilename = null;
       loopStartTime = 0; loopEndTime = 0;
+      currentClipIsLoopOnly = false; loopOnlyAwaitingFirstPlay = false;
       if (reviewPlaybackUrl) { URL.revokeObjectURL(reviewPlaybackUrl); reviewPlaybackUrl = null; }
 
       reviewPlayer.pause();
@@ -1605,6 +1727,7 @@
       viewfinder.classList.add('active-view');
 
       watermarkEl.classList.remove('watermark-active');
+      watermarkEl.style.left = ''; watermarkEl.style.top = ''; watermarkEl.style.transform = '';
 
       reviewPlayer.muted = true; muteReviewBtn.innerText = "Muted"; muteReviewBtn.classList.add('is-muted');
       masterTimeline.classList.remove('show'); refTimeline.classList.remove('show'); syncOffsetRow.classList.remove('show'); resetSyncOffset(); downloadBtn.style.display = "none";
@@ -1614,12 +1737,15 @@
       streamLabel.innerHTML = `<span>YOU (LIVE CAM)</span><span class="zoom-note" id="zoomNote">Zoom applies to preview window only</span>`;
 
       previewRefBtn.classList.remove('hidden'); previewRefBtn.innerText = "Preview Ref"; previewRefBtn.className = "custom-png-btn";
-      overlayToggleBtn.classList.remove('hidden'); opacitySelector.classList.remove('hidden');
-      overlayToggleBtn.disabled = false; opacitySelector.disabled = false; overlayActive = true;
+      overlayToggleBtn.classList.remove('hidden');
+      overlayToggleBtn.disabled = false; overlayActive = true;
+      if (overlayActive) { opacitySelector.classList.remove('hidden'); opacitySelector.disabled = false; }
       cameraOverlay.classList.remove('hidden');
       actionBtn.innerText = "Start Session"; actionBtn.className = "custom-png-btn"; actionBtn.disabled = false;
       resetBtn.innerText = "Reset / Clear"; resetBtn.disabled = true; resetBtn.style.display = "none"; resetBtn.classList.remove('danger-active');
       document.getElementById('appContent').classList.remove('loop-only-mode');
+      videoBox.classList.remove('ref-is-fullscreen');
+      refFsPlayPauseBtn.classList.remove('fade-out');
     }
 
     function handleSignOut() {
@@ -1655,6 +1781,8 @@
     }
 
     function startWatermarkEngine() {
+      if (watermarkTimer) clearInterval(watermarkTimer);
+
       const safeName = escapeHtml(authorizedUser);
       const safeTag = escapeHtml(watermarkTag);
       const safeMobileTag = escapeHtml(watermarkTagMobile || watermarkTag);
@@ -1666,6 +1794,17 @@
         `<span class="wm-desktop-line"> • ${safeTag}</span>` +
         `<span class="wm-mobile-line">${safeMobileTag}</span>`;
       watermarkEl.classList.add('watermark-active');
+
+      if (currentClipIsLoopOnly) {
+        // Loop Practice screens keep the watermark static and centered rather
+        // than drifting around, so it doesn't distract from following the loop.
+        watermarkEl.style.left = '50%';
+        watermarkEl.style.top = '50%';
+        watermarkEl.style.transform = 'translate(-50%, -50%)';
+        return;
+      }
+
+      watermarkEl.style.transform = '';
       const moveWatermark = () => {
         const container = refVideo.parentElement;
         const maxX = container.clientWidth - watermarkEl.clientWidth - 24;
@@ -1697,7 +1836,7 @@
         }
         if (overlayActive) { cameraOverlay.classList.remove('hidden'); }
         overlayToggleBtn.classList.remove('hidden');
-        opacitySelector.classList.remove('hidden');
+        if (overlayActive) opacitySelector.classList.remove('hidden');
         masterTimeline.classList.remove('show');
         refTimeline.classList.remove('show');
         previewRefBtn.classList.remove('hidden');
@@ -1723,14 +1862,28 @@
       if (overlayActive) { 
         cameraOverlay.classList.remove('hidden'); 
         overlayToggleBtn.innerText = "Overlay On"; overlayToggleBtn.classList.remove('overlay-off'); 
+        opacitySelector.classList.remove('hidden');
       } else { 
         cameraOverlay.classList.add('hidden'); 
         overlayToggleBtn.innerText = "Overlay Off"; overlayToggleBtn.classList.add('overlay-off'); 
+        opacitySelector.classList.add('hidden');
       }
     });
 
     previewRefBtn.addEventListener('click', () => {
       if (isRecordingMode || isReviewMode) return;
+
+      if (loopOnlyAwaitingFirstPlay) {
+        // First real tap on a staged Loop Practice screen - start playback
+        // without resetting the loop range (preserves any pre-play handle
+        // adjustments the user already made).
+        loopOnlyAwaitingFirstPlay = false;
+        previewRefBtn.classList.remove('ready-to-play');
+        previewRefBtn.classList.add('previewing');
+        previewRefBtn.innerText = "Pause Preview";
+        refVideo.play().catch(() => {});
+        return;
+      }
 
       if (!isPreviewingRef) {
         // First tap: enter preview mode fresh, starting from the top.
@@ -1829,11 +1982,12 @@
       previewRefBtn.classList.add('hidden');
 
       overlayToggleBtn.classList.remove('hidden');
-      opacitySelector.classList.remove('hidden');
       if (overlayActive) {
         cameraOverlay.classList.remove('hidden');
+        opacitySelector.classList.remove('hidden');
       } else {
         cameraOverlay.classList.add('hidden');
+        opacitySelector.classList.add('hidden');
       }
       
       masterTimeline.classList.remove('show'); refTimeline.classList.remove('show'); syncOffsetRow.classList.remove('show');
@@ -2221,9 +2375,11 @@
           updateRefTrackUi();
           updateRefTimeDisplay(refVideo.currentTime);
         }
-        // Only loop if the user has actually narrowed the range - default
-        // behavior is still to just play straight through to the natural end.
-        if (isLoopRangeNarrowed() && refVideo.currentTime >= loopEndTime - 0.05) {
+        // Loop Practice clips always loop regardless of range narrowing;
+        // camera-flow Preview Ref only loops once the user has actually
+        // narrowed the range - default behavior there is to play straight
+        // through to the natural end.
+        if ((currentClipIsLoopOnly || isLoopRangeNarrowed()) && refVideo.currentTime >= loopEndTime - 0.05) {
           refVideo.currentTime = loopStartTime;
         }
       }
@@ -2355,8 +2511,8 @@
       actionBtn.className = "custom-png-btn";
       
       overlayToggleBtn.classList.remove('hidden');
-      opacitySelector.classList.remove('hidden');
-      if (overlayActive) cameraOverlay.classList.remove('hidden');
+      if (overlayActive) { cameraOverlay.classList.remove('hidden'); opacitySelector.classList.remove('hidden'); }
+      else { opacitySelector.classList.add('hidden'); }
 
       setupInitialState();
     }
