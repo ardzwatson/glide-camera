@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kapa Sync Video Review (31.1-Demon's Blade)</title>
+  <title>Kapa Sync Video Review (31.2-Demon's Blade)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -234,7 +234,7 @@
     #videoBox.ref-is-fullscreen .ref-fs-playpause-btn { display: flex; }
 
     .ref-volume-control {
-      display: none;
+      display: flex;
       position: absolute;
       bottom: 12px;
       left: 12px;
@@ -245,7 +245,6 @@
       border-radius: 20px;
       z-index: 20;
     }
-    #appContent.loop-only-mode .ref-volume-control { display: flex; }
     .ref-volume-btn {
       border: none;
       background: transparent;
@@ -601,6 +600,7 @@
       justify-content: space-between;
       margin-bottom: 18px;
       flex-shrink: 0;
+      gap: 12px;
     }
     .hub-title {
       font-family: 'Marcellus', serif;
@@ -608,6 +608,25 @@
       font-size: 20px;
       margin: 0;
       letter-spacing: 0.5px;
+    }
+    .hub-topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .hub-tag-filter {
+      font-family: 'Marcellus', serif;
+      font-size: 11px;
+      font-weight: bold;
+      color: white;
+      background: #1c1c1e;
+      border: 1px solid #3a3a3c;
+      border-radius: 6px;
+      padding: 8px 10px;
+      cursor: pointer;
+      outline: none;
+      flex-shrink: 0;
     }
     .hub-signout-btn {
       font-family: 'Marcellus', serif;
@@ -646,11 +665,24 @@
     .hub-card.hub-card-default { border-color: #5856d6; }
 
     .hub-card-thumb {
+      position: relative;
       width: 100%;
       aspect-ratio: 16 / 9;
       background-size: cover;
       background-position: center;
       background-color: #000;
+    }
+    /* Sized to match the card title's font-size (.hub-card-name) so the icon
+       reads at the same visual scale as the text beneath it, regardless of
+       the icon image's native dimensions. */
+    .hub-card-icon {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      height: 12px;
+      width: auto;
+      opacity: 0.4;
+      pointer-events: none;
     }
     .hub-card-name {
       font-family: 'Marcellus', serif;
@@ -670,6 +702,18 @@
       text-align: center;
     }
     .hub-card-badge-loop { color: #ff9500; }
+
+    /* Matches .hub-card-badge's font-size - colour is set inline per-card
+       from the Video Library's Icon Colour column. */
+    .hub-card-tag {
+      font-family: 'Marcellus', serif;
+      font-size: 9px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-align: center;
+      padding: 0 10px 8px 10px;
+    }
 
     .hub-empty-message {
       color: #8e8e93;
@@ -701,7 +745,12 @@
   <div id="videoHubScreen">
     <div class="hub-topbar">
       <h2 class="hub-title">🔥 Te Ahi Kā 🔥</h2>
-      <button id="hubSignOutBtn" class="hub-signout-btn">Sign Out</button>
+      <div class="hub-topbar-actions">
+        <select id="hubTagFilter" class="hub-tag-filter" aria-label="Filter by tag">
+          <option value="all">All</option>
+        </select>
+        <button id="hubSignOutBtn" class="hub-signout-btn">Sign Out</button>
+      </div>
     </div>
     <div class="hub-grid" id="hubGrid"></div>
   </div>
@@ -843,6 +892,7 @@
     const videoHubScreen = document.getElementById('videoHubScreen');
     const hubGrid = document.getElementById('hubGrid');
     const hubSignOutBtn = document.getElementById('hubSignOutBtn');
+    const hubTagFilter = document.getElementById('hubTagFilter');
 
     const viewfinder = document.getElementById('viewfinder');
     const reviewPlayer = document.getElementById('reviewPlayer');
@@ -1440,13 +1490,25 @@
           const isLoopOnly = (columns[6] || '').trim().toUpperCase() === 'TRUE';
           const noWatermark = (columns[7] || '').trim().toUpperCase() === 'TRUE';
 
+          // Column I: a short category/style tag shown on the clip's card and
+          // used to populate the Te Ahi Kā tag filter. Column J: an icon image
+          // URL overlaid on the thumbnail. Column K: hex colour applied to
+          // both the icon (via the card's tag text) - lets each tag have a
+          // distinct at-a-glance colour without hardcoding a palette in code.
+          const tag = (columns[8] || '').trim();
+          const icon = (columns[9] || '').trim();
+          const iconColor = (columns[10] || '').trim();
+
           clipLibrary[clipId] = {
             name: clipName,
             hlsUrl,
             thumbnailUrl: thumbnailUrl || null,
             thumbnailTime,
             isLoopOnly,
-            noWatermark
+            noWatermark,
+            tag,
+            icon,
+            iconColor
           };
         });
         console.info(`Video Library loaded: ${Object.keys(clipLibrary).length} clip(s) - [${Object.keys(clipLibrary).join(', ')}]`);
@@ -1557,7 +1619,10 @@
           thumbnailTime: (clip.thumbnailTime !== null && clip.thumbnailTime !== undefined) ? clip.thumbnailTime : DEFAULT_ALIGN_TIME,
           isDefault: false,
           isLoopOnly: !!clip.isLoopOnly,
-          noWatermark: !!clip.noWatermark
+          noWatermark: !!clip.noWatermark,
+          tag: clip.tag || '',
+          icon: clip.icon || '',
+          iconColor: clip.iconColor || '#ffffff'
         });
       });
 
@@ -1566,8 +1631,19 @@
 
 
 
-    function showVideoHub(userRecord) {
-      const cards = buildClipCards(userRecord);
+    // Cards from the most recent showVideoHub() call, kept around so the tag
+    // filter can re-render a subset without re-fetching or re-building from
+    // the user record each time.
+    let currentHubCards = [];
+
+    function populateTagFilter(cards) {
+      const uniqueTags = Array.from(new Set(cards.map(c => c.tag).filter(t => t))).sort((a, b) => a.localeCompare(b));
+      hubTagFilter.innerHTML = '<option value="all">All</option>' +
+        uniqueTags.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+      hubTagFilter.value = 'all';
+    }
+
+    function renderHubGrid(cards) {
       hubGrid.innerHTML = '';
 
       if (cards.length === 0) {
@@ -1575,40 +1651,69 @@
         msg.className = 'hub-empty-message';
         msg.textContent = 'No clips have been assigned to your account yet.';
         hubGrid.appendChild(msg);
-      } else {
-        cards.forEach(clip => {
-          const card = document.createElement('div');
-          card.className = 'hub-card' + (clip.isDefault ? ' hub-card-default' : '');
-
-          const thumb = document.createElement('div');
-          thumb.className = 'hub-card-thumb';
-          thumb.style.backgroundImage = `url('${clip.thumbnailUrl}')`;
-          card.appendChild(thumb);
-
-          const name = document.createElement('div');
-          name.className = 'hub-card-name';
-          name.textContent = clip.name;
-          card.appendChild(name);
-
-          if (clip.isDefault) {
-            const badge = document.createElement('div');
-            badge.className = 'hub-card-badge';
-            badge.textContent = 'Your Default';
-            card.appendChild(badge);
-          } else if (clip.isLoopOnly) {
-            const badge = document.createElement('div');
-            badge.className = 'hub-card-badge hub-card-badge-loop';
-            badge.textContent = 'Loop Practice';
-            card.appendChild(badge);
-          }
-
-          card.addEventListener('click', () => selectClipAndEnterApp(clip));
-          hubGrid.appendChild(card);
-        });
+        return;
       }
 
+      cards.forEach(clip => {
+        const card = document.createElement('div');
+        card.className = 'hub-card' + (clip.isDefault ? ' hub-card-default' : '');
+
+        const thumb = document.createElement('div');
+        thumb.className = 'hub-card-thumb';
+        thumb.style.backgroundImage = `url('${clip.thumbnailUrl}')`;
+
+        if (clip.icon) {
+          const iconImg = document.createElement('img');
+          iconImg.className = 'hub-card-icon';
+          iconImg.src = clip.icon;
+          iconImg.alt = '';
+          thumb.appendChild(iconImg);
+        }
+        card.appendChild(thumb);
+
+        const name = document.createElement('div');
+        name.className = 'hub-card-name';
+        name.textContent = clip.name;
+        card.appendChild(name);
+
+        if (clip.isDefault) {
+          const badge = document.createElement('div');
+          badge.className = 'hub-card-badge';
+          badge.textContent = 'Your Default';
+          card.appendChild(badge);
+        } else if (clip.isLoopOnly) {
+          const badge = document.createElement('div');
+          badge.className = 'hub-card-badge hub-card-badge-loop';
+          badge.textContent = 'Loop Practice';
+          card.appendChild(badge);
+        }
+
+        if (clip.tag) {
+          const tagEl = document.createElement('div');
+          tagEl.className = 'hub-card-tag';
+          tagEl.textContent = clip.tag;
+          tagEl.style.color = clip.iconColor || '#ffffff';
+          card.appendChild(tagEl);
+        }
+
+        card.addEventListener('click', () => selectClipAndEnterApp(clip));
+        hubGrid.appendChild(card);
+      });
+    }
+
+    function showVideoHub(userRecord) {
+      const cards = buildClipCards(userRecord);
+      currentHubCards = cards;
+      populateTagFilter(cards);
+      renderHubGrid(cards);
       videoHubScreen.classList.add('show');
     }
+
+    hubTagFilter.addEventListener('change', () => {
+      const selected = hubTagFilter.value;
+      const filtered = selected === 'all' ? currentHubCards : currentHubCards.filter(c => c.tag === selected);
+      renderHubGrid(filtered);
+    });
 
     function selectClipAndEnterApp(clip) {
       if (clip.isLoopOnly) {
