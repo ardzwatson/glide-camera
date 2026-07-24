@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Kapa Sync Video Review (31.2-Raging Storm)</title>
+  <title>Kapa Sync Video Review (31.3 PRE-Raging Storm)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap" rel="stylesheet">
@@ -238,6 +238,47 @@
     .ref-fs-playpause-btn:active { transform: translate(-50%, -50%) scale(0.92); }
     .ref-fs-playpause-btn.fade-out { opacity: 0; pointer-events: none; }
     #videoBox.ref-is-fullscreen .ref-fs-playpause-btn { display: flex; }
+
+    /* Audio track switcher - Loop Practice clips only. Hidden until JS finds
+       more than one HLS audio track for the current clip and populates it. */
+    .ref-audio-track-bar {
+      display: none;
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.6);
+      padding: 4px 6px;
+      border-radius: 20px;
+      gap: 6px;
+      z-index: 20;
+      align-items: center;
+      max-width: 90%;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .ref-audio-track-bar::-webkit-scrollbar { display: none; }
+    #appContent.loop-only-mode .ref-audio-track-bar.show { display: flex; }
+    .ref-audio-track-btn {
+      font-family: 'Marcellus', serif;
+      font-size: 10px;
+      font-weight: bold;
+      color: #ccc;
+      background: transparent;
+      border: 1px solid #48484a;
+      border-radius: 14px;
+      padding: 5px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+    .ref-audio-track-btn:hover { border-color: #777; color: white; }
+    .ref-audio-track-btn.active {
+      background: linear-gradient(135deg, #3396ff, #0056b3);
+      color: white;
+      border-color: transparent;
+    }
 
     .ref-volume-control {
       display: flex;
@@ -732,7 +773,7 @@
       <input type="text" id="gatePass" class="gate-input gate-input-masked" inputmode="text" placeholder="Access Key" autofocus>
       <button onclick="unlockPortal()" class="gate-btn" id="unlockBtn">Tahuna Te Ahi</button>
       <div id="gateError" class="gate-error">Loading security database... Please wait.</div>
-      <div class="gate-build-tag">31.2 - Raging Storm Build</div>
+      <div class="gate-build-tag">31.3 PRE - Raging Storm Build</div>
     </div>
   </div>
 
@@ -775,6 +816,7 @@
         </div>
         <button type="button" class="ref-fullscreen-btn" id="refFullscreenBtn" aria-label="Toggle fullscreen">⛶</button>
         <button type="button" class="ref-fs-playpause-btn" id="refFsPlayPauseBtn" aria-label="Play/Pause">▶</button>
+        <div class="ref-audio-track-bar" id="refAudioTrackBar"></div>
       </div>
       
       <div class="box" id="cameraBox">
@@ -832,7 +874,7 @@
         <option value="1.0">100%</option>
       </select>
       <button id="downloadBtn" class="custom-png-btn">Save</button>
-      <div class="version-tag">31.2</div>
+      <div class="version-tag">31.3 PRE - Raging Storm</div>
     </div>
   </div>
 
@@ -880,6 +922,7 @@
     const videoBox = document.getElementById('videoBox');
     const refFullscreenBtn = document.getElementById('refFullscreenBtn');
     const refFsPlayPauseBtn = document.getElementById('refFsPlayPauseBtn');
+    const refAudioTrackBar = document.getElementById('refAudioTrackBar');
     const refVolumeBtn = document.getElementById('refVolumeBtn');
     const refVolumeSlider = document.getElementById('refVolumeSlider');
     const gateError = document.getElementById('gateError');
@@ -1525,6 +1568,10 @@
     // user picks a different clip from the hub, not just once at login.
     function initializeReferenceVideoPlayback() {
       if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+      // Clear any buttons from the previous clip immediately - otherwise the
+      // old clip's tracks would flash on screen until the new manifest loads.
+      refAudioTrackBar.innerHTML = '';
+      refAudioTrackBar.classList.remove('show');
 
       if (Hls.isSupported()) {
         hlsInstance = new Hls({
@@ -1562,6 +1609,19 @@
           }
         });
 
+        // Fires once hls.js has finished parsing the #EXT-X-MEDIA:TYPE=AUDIO
+        // groups out of the manifest - this is the reliable point to read
+        // hls.audioTracks from, rather than assuming it's ready right after
+        // loadSource()/MANIFEST_PARSED.
+        hlsInstance.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
+          renderAudioTrackButtons();
+        });
+        // Keeps the active-button highlight correct if the track ever changes
+        // via a path other than a button click (e.g. hls.js's own recovery).
+        hlsInstance.on(Hls.Events.AUDIO_TRACK_SWITCHED, (event, data) => {
+          highlightActiveAudioTrackButton(data.id);
+        });
+
         // Auto-recover from stalls/errors instead of leaving playback stuck.
         hlsInstance.on(Hls.Events.ERROR, (event, data) => {
           if (!data.fatal) return;
@@ -1584,6 +1644,64 @@
       } else if (refVideo.canPlayType('application/vnd.apple.mpegurl')) {
         refVideo.src = activeHlsUrl;
       }
+    }
+
+    // --- Reference video audio track switcher (Loop Practice only) ---
+    // Maps whatever raw language code/name hls.js reports for a track (this
+    // varies by encoder - could be a 2-letter code, a 3-letter code, or a
+    // full name) to the label shown on its button. Add more entries here as
+    // new languages/dubs are added to the library. Keys are matched
+    // case-insensitively against both track.lang and track.name.
+    const AUDIO_TRACK_LABEL_MAP = {
+      'en': 'English', 'eng': 'English', 'english': 'English',
+      'ja': 'Anime', 'jpn': 'Anime', 'ja-jp': 'Anime', 'japanese': 'Anime',
+      'fr': 'French', 'fre': 'French', 'fra': 'French', 'french': 'French',
+      'mi': 'Te Reo', 'mri': 'Te Reo', 'mao': 'Te Reo', 'maori': 'Te Reo', 'māori': 'Te Reo'
+    };
+
+    function getAudioTrackLabel(track) {
+      const langKey = (track.lang || '').toString().trim().toLowerCase();
+      const nameKey = (track.name || '').toString().trim().toLowerCase();
+      return AUDIO_TRACK_LABEL_MAP[langKey] || AUDIO_TRACK_LABEL_MAP[nameKey] ||
+        track.name || track.lang || `Track ${track.id + 1}`;
+    }
+
+    // Reads hls.audioTracks and builds one button per track. Only shown (via
+    // the .show class + the loop-only-mode CSS scope) when a clip actually
+    // has more than one track - single-track clips get no UI at all.
+    function renderAudioTrackButtons() {
+      refAudioTrackBar.innerHTML = '';
+      if (!hlsInstance || !hlsInstance.audioTracks || hlsInstance.audioTracks.length <= 1) {
+        refAudioTrackBar.classList.remove('show');
+        return;
+      }
+
+      hlsInstance.audioTracks.forEach((track) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ref-audio-track-btn' + (track.id === hlsInstance.audioTrack ? ' active' : '');
+        btn.textContent = getAudioTrackLabel(track);
+        btn.dataset.trackId = track.id;
+        btn.addEventListener('click', () => switchAudioTrack(track.id));
+        refAudioTrackBar.appendChild(btn);
+      });
+      refAudioTrackBar.classList.add('show');
+    }
+
+    function highlightActiveAudioTrackButton(activeId) {
+      Array.from(refAudioTrackBar.children).forEach((btn) => {
+        btn.classList.toggle('active', parseInt(btn.dataset.trackId, 10) === activeId);
+      });
+    }
+
+    function switchAudioTrack(index) {
+      if (!hlsInstance || hlsInstance.audioTrack === index) return;
+      // Setting hls.audioTrack swaps only the audio adaptation set at the
+      // next safe boundary - hls.js keeps the existing video buffer and
+      // playback position intact, so this never restarts or re-buffers
+      // the stream.
+      hlsInstance.audioTrack = index;
+      highlightActiveAudioTrackButton(index);
     }
 
     // Builds the list of clips a given user is allowed to pick from - purely
@@ -1879,6 +1997,8 @@
       document.getElementById('appContent').classList.remove('loop-only-mode');
       videoBox.classList.remove('ref-is-fullscreen');
       refFsPlayPauseBtn.classList.remove('fade-out');
+      refAudioTrackBar.innerHTML = '';
+      refAudioTrackBar.classList.remove('show');
     }
 
     function handleSignOut() {
